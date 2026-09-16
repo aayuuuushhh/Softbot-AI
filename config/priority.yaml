@@ -1,0 +1,64 @@
+# Response Priority Score configuration.
+# Tunable live during the demo - nothing here is hardcoded in Python.
+
+# Weights for the four components. Must sum to 1.0.
+weights:
+  damage: 0.40
+  population: 0.30
+  infrastructure: 0.20
+  accessibility: 0.10
+
+# Per-class contribution to a ward's damage score.
+damage_class_weights:
+  destroyed: 1.0
+  major-damage: 0.6
+  minor-damage: 0.3
+  no-damage: 0.0
+
+# Critical facility importance. Summed within `facility_radius_m` of damaged
+# buildings, then clipped to 1.0.
+facility_weights:
+  hospital: 1.0
+  bridge: 0.7
+  school: 0.5
+  police: 0.4
+  fire_station: 0.6
+facility_radius_m: 500
+
+# Which facility types a responder actually needs called out on the ward card. A dense
+# Kathmandu ward contains 150+ schools and clinics; surfacing "199 critical facilities"
+# tells nobody anything. Hospitals, bridges and fire stations are the life-safety set.
+headline_facility_types: [hospital, bridge, fire_station]
+
+# Priority bands, evaluated top-down: the first band whose `min` is met wins.
+bands:
+  - { name: "Very High", min: 0.75, color: "#b91c1c" }
+  - { name: "High",      min: 0.50, color: "#ea580c" }
+  - { name: "Medium",    min: 0.25, color: "#ca8a04" }
+  - { name: "Low",       min: 0.0,  color: "#65a30d" }
+
+# Map legend (see PROJECT_PLAN.md section 4).
+damage_colors:
+  destroyed: "#dc2626"      # Red - severe damage
+  major-damage: "#f97316"   # Orange - moderate damage
+  minor-damage: "#facc15"   # Yellow - suspected damage
+  no-damage: "#94a3b8"      # Grey - undamaged
+critical_infrastructure_color: "#2563eb"  # Blue
+
+# Population estimation
+population:
+  # Buffer around each damaged building for the WorldPop zonal sum.
+  building_buffer_m: 25
+
+  # WorldPop's "constrained" raster places Nepal's population on only ~2,057 km2 of
+  # built-settlement cells. The national total comes out about right, but packing it into
+  # too few cells inflates local density - zonal sums over Kathmandu read ~3x high, and the
+  # hottest cell implies 4.7 million people per km2, which is impossible.
+  #
+  # The priority *ranking* is unaffected (population is normalized against the AOI maximum,
+  # so a uniform bias cancels), but the "estimated affected population" shown to responders
+  # would be wrong. So anchor the raster to a census total for the AOI.
+  calibration:
+    enabled: true
+    reference_name: "Kathmandu Metropolitan City, 2021 census"
+    reference_total: 845767

@@ -1,0 +1,21 @@
+# API
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+pydantic==2.13.5
+PyYAML==6.0.3
+python-multipart==0.0.32
+numpy==2.4.6
+pillow==12.3.0
+
+# GIS - needed once real imagery and footprints land (H24-H40)
+geopandas>=1.0
+rasterio>=1.4
+shapely>=2.0
+pyproj>=3.7
+
+# Persistence (H24-H40, replaces the in-memory store)
+SQLAlchemy>=2.0
+
+# Tests
+pytest==9.1.1
+httpx==0.28.1

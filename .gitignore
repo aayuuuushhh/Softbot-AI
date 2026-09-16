@@ -1,0 +1,37 @@
+# Data (rebuild with scripts/download_data.sh - see data/README.md)
+data/raw/
+data/interim/
+data/processed/
+data/nepal/
+!data/**/.gitkeep
+
+# Models
+*.pt
+*.pth
+*.ckpt
+checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Database
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env / editor
+.env
+.env.local
+.DS_Store
+.idea/
+.vscode/

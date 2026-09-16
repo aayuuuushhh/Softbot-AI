@@ -1,0 +1,31 @@
+# All paths are relative to the repo root.
+
+data:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  nepal: data/nepal
+
+nepal:
+  wards: data/nepal/wards.geojson
+  facilities: data/nepal/facilities.geojson
+  buildings: data/nepal/buildings.geojson
+  roads: data/nepal/roads.geojson
+  population: data/nepal/worldpop.tif
+
+xbd:
+  root: data/raw/xbd
+  images: data/raw/xbd/images
+  labels: data/raw/xbd/labels
+
+processed:
+  chips: data/processed/chips
+  manifest: data/processed/manifest.csv
+
+model:
+  checkpoint: ml/checkpoints/siamese_resnet18.pt
+
+# Coordinate reference systems
+crs:
+  storage: EPSG:4326    # lat/lon, what the API and Leaflet speak
+  metric: EPSG:32645    # UTM 45N - use for area, distance and buffer math in Nepal

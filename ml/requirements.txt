@@ -1,0 +1,11 @@
+# Training the siamese damage classifier. Installed on top of backend/requirements.txt.
+#
+# The default index ships CUDA wheels (~3 GB). For a CPU-only machine:
+#   uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+torch>=2.5
+torchvision>=0.20
+scikit-learn>=1.5
+tqdm>=4.66
+
+# Stretch goal: U-Net building localization instead of OSM footprints
+# segmentation-models-pytorch>=0.3
