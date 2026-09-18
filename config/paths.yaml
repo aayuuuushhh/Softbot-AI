@@ -15,12 +15,27 @@ nepal:
 
 xbd:
   root: data/raw/xbd
-  images: data/raw/xbd/images
-  labels: data/raw/xbd/labels
+  # xBD ships an official train/test split; keep it. Flattening the two would put tiles from
+  # the same event on both sides of the evaluation.
+  train: data/raw/xbd/train
+  test: data/raw/xbd/test
+  images: data/raw/xbd/train/images
+  labels: data/raw/xbd/train/labels
+  # Events the severity classifier learns from. mexico-earthquake is deliberately absent:
+  # it is 99.4% no-damage (3 destroyed buildings total), so it is useless for training but
+  # is the only earthquake in the pool, which makes it the honest domain hold-out.
+  train_events:
+    - hurricane-michael
+    - palu-tsunami
+    - santa-rosa-wildfire
+  holdout_events:
+    - mexico-earthquake
 
 processed:
   chips: data/processed/chips
   manifest: data/processed/manifest.csv
+  manifest_test: data/processed/manifest_test.csv
+  manifest_holdout: data/processed/manifest_holdout.csv
 
 model:
   checkpoint: ml/checkpoints/siamese_resnet18.pt

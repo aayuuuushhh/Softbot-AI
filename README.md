@@ -49,7 +49,9 @@ correct the AI's call.
 | Dashboard: map, ward cards, review drawer, export | **done** |
 | Real Nepal GIS — 32 Kathmandu wards, 150k OSM buildings, 2.3k facilities, WorldPop | **done** |
 | Heuristic damage classifier (fallback path) | **done**, unit-tested |
-| Siamese CNN: model, dataset, training loop, inference | **written**, needs xBD data to train |
+| xBD training data — 1,027 tile pairs, 4 events, 130k buildings | **done**, verified |
+| Chips + manifests — 66k train / 20k test / 44k earthquake hold-out | **done** |
+| Siamese CNN: model, dataset, training loop, inference, evaluation | **written**, smoke-tested; training not yet run |
 | Damage from real imagery | not yet — simulated from a shaking field; `mode=model` returns 501 |
 
 The dashboard labels **two** things separately in the header, because they are separately
@@ -72,12 +74,34 @@ curl -X POST "localhost:8000/api/assessments/demo?epicentre_lon=85.29&epicentre_
 
 ```bash
 bash scripts/download_data.sh                  # OSM + WorldPop (already fetched in this repo)
+bash scripts/fetch_xbd.sh                              # xBD imagery + damage labels (3.3 GB)
 .venv/bin/python scripts/run_pipeline.py --prepare    # extract chips, print class balance
 .venv/bin/python -m ml.train --epochs 8               # train the siamese classifier
+.venv/bin/python -m ml.evaluate                       # score it on the held-out sets
 .venv/bin/python scripts/run_pipeline.py --assess \
     --pre data/raw/pre.tif --post data/raw/post.tif \
     --footprints data/nepal/buildings.geojson --mode model
 ```
+
+### Training on another machine
+
+The chips and manifests travel; the raw tiles do not need to.
+
+```bash
+bash scripts/make_training_bundle.sh     # -> data/xbd_training_bundle.tar (+ .sha256)
+```
+
+Unpack it at the root of a clone, train, then bring back
+`ml/checkpoints/siamese_resnet18.pt` and run `python -m ml.evaluate` here. Manifests store
+chip paths relative to the repo root, so they resolve wherever the bundle lands.
+
+### What the model trains on
+
+Three events — `hurricane-michael`, `palu-tsunami`, `santa-rosa-wildfire` — chosen for class
+coverage, not disaster type. `mexico-earthquake` is deliberately **excluded from training**:
+it is 99.4% no-damage with 3 destroyed buildings in the whole event, so it cannot teach the
+rare classes, but it is the only earthquake in the pool and therefore the honest test of
+seismic transfer. `ml/evaluate.py` reports the macro-F1 drop from test to that hold-out.
 
 See **[data/README.md](./data/README.md)** for every dataset, its source and its license.
 
@@ -85,10 +109,10 @@ See **[data/README.md](./data/README.md)** for every dataset, its source and its
 
 ```
 backend/    FastAPI: routers, ward aggregation, priority scoring, exports, tests
-ml/         siamese damage classifier: dataset, model, train, infer
+ml/         siamese damage classifier: dataset, model, train, evaluate, infer
 frontend/   React + Leaflet dashboard
 config/     priority.yaml (weights, bands, colors), paths.yaml
-scripts/    download_data.sh, run_pipeline.py
+scripts/    download_data.sh, fetch_xbd.sh, run_pipeline.py, make_training_bundle.sh
 data/       gitignored - see data/README.md
 ```
 

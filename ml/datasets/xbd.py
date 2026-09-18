@@ -24,6 +24,10 @@ from ..models.siamese import DAMAGE_CLASSES
 CHIP_SIZE = 128
 PADDING_PX = 10
 
+# Chip paths are stored in the manifest relative to this, so a manifest extracted on one
+# machine still resolves after the chips are copied to whatever box does the training.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
@@ -53,18 +57,28 @@ def _polygon_bounds(wkt: str) -> tuple[float, float, float, float]:
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def extract_chips(xbd_root: Path, out_dir: Path, disasters: list[str] | None = None) -> Path:
+def extract_chips(
+    xbd_root: Path,
+    out_dir: Path,
+    disasters: list[str] | None = None,
+    manifest_path: Path | None = None,
+) -> Path:
     """Crop every labelled building from its pre/post tile pair.
 
     Returns the path to the manifest CSV. Labels come from the *post* JSON, which is the only
     one carrying `subtype`.
+
+    `disasters` filters by event name, which is how the earthquake hold-out is built: the
+    training manifest excludes mexico-earthquake so it can be scored as unseen seismic terrain.
     """
     images_dir, labels_dir = xbd_root / "images", xbd_root / "labels"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "pre").mkdir(exist_ok=True)
     (out_dir / "post").mkdir(exist_ok=True)
 
-    manifest_path = out_dir.parent / "manifest.csv"
+    if manifest_path is None:
+        manifest_path = out_dir.parent / "manifest.csv"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     rows: list[ChipRecord] = []
 
     for post_label in sorted(labels_dir.glob("*_post_disaster.json")):
@@ -103,7 +117,10 @@ def extract_chips(xbd_root: Path, out_dir: Path, disasters: list[str] | None = N
             pre_image.crop(box).resize((CHIP_SIZE, CHIP_SIZE)).save(pre_out)
             post_image.crop(box).resize((CHIP_SIZE, CHIP_SIZE)).save(post_out)
 
-            rows.append(ChipRecord(chip_id, str(pre_out), str(post_out), damage, disaster))
+            rows.append(
+                ChipRecord(chip_id, _repo_relative(pre_out), _repo_relative(post_out),
+                           damage, disaster)
+            )
 
     with open(manifest_path, "w", newline="") as f:
         writer = csv.writer(f)
@@ -112,6 +129,20 @@ def extract_chips(xbd_root: Path, out_dir: Path, disasters: list[str] | None = N
             writer.writerow([r.chip_id, r.pre_path, r.post_path, r.damage_class, r.disaster])
 
     return manifest_path
+
+
+def _repo_relative(path: Path) -> str:
+    """Store `data/processed/...` rather than `/home/someone/...`."""
+    try:
+        return str(path.resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)  # chips written outside the repo stay absolute
+
+
+def chip_path(stored: str) -> Path:
+    """Inverse of `_repo_relative` - what the Dataset opens."""
+    path = Path(stored)
+    return path if path.is_absolute() else REPO_ROOT / path
 
 
 def _find_image(images_dir: Path, stem: str) -> Path | None:
@@ -156,8 +187,8 @@ class XBDChipDataset(Dataset):
 
     def __getitem__(self, index: int):
         record = self.records[index]
-        pre = Image.open(record.pre_path).convert("RGB")
-        post = Image.open(record.post_path).convert("RGB")
+        pre = Image.open(chip_path(record.pre_path)).convert("RGB")
+        post = Image.open(chip_path(record.post_path)).convert("RGB")
 
         if self.augment:
             pre, post = self._augment(pre, post)

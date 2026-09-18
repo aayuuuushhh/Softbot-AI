@@ -14,23 +14,72 @@ recipe to rebuild it. Run `bash scripts/download_data.sh` for the automatable pa
 
 ## 1. xBD / xView2 — primary imagery + damage labels
 
-**Manual step.** Register at <https://xview2.org/dataset> and download the challenge data,
-then unpack into `data/raw/xbd/`:
+**Already downloaded** by `scripts/fetch_xbd.sh` (3.3 GB, 1,027 tile pairs). xview2.org needs
+registration and is slow; we pull from the `aryananand/xBD` HuggingFace mirror instead, which
+preserves the original directory layout:
 
 ```
 data/raw/xbd/
-  images/   <disaster>_<id>_pre_disaster.png|tif
-            <disaster>_<id>_post_disaster.png|tif
-  labels/   <disaster>_<id>_pre_disaster.json   (building polygons)
-            <disaster>_<id>_post_disaster.json  (polygons + damage subtype)
+  train/images/   <disaster>_<id>_{pre,post}_disaster.png
+  train/labels/   <disaster>_<id>_{pre,post}_disaster.json
+  test/images/    ...
+  test/labels/    ...
 ```
 
-- Paired pre/post 1024x1024 RGB tiles.
-- Damage labels: `no-damage`, `minor-damage`, `major-damage`, `destroyed`.
-- **License: CC BY-NC-SA 4.0 — non-commercial.** Credit it on the demo slide.
+Keep the `train/`/`test/` nesting. It is xBD's own split; flattening it puts tiles from the
+same event on both sides of the evaluation.
 
-For the sprint, the `tier1` split alone is plenty. Prefer earthquake disasters
-(e.g. `mexico-earthquake`) to match our MVP scope.
+### Which events, and why
+
+| event | tiles | buildings | no-damage | minor | major | destroyed |
+|---|---:|---:|---:|---:|---:|---:|
+| hurricane-michael | 422 | 26,491 | 64.4% | 23.7% | 8.5% | 3.5% |
+| palu-tsunami | 155 | 43,407 | 83.8% | 0.0% | 1.9% | 14.3% |
+| santa-rosa-wildfire | 291 | 16,919 | 73.0% | 0.6% | 0.4% | 26.1% |
+| mexico-earthquake | 159 | 43,596 | 99.4% | 0.4% | 0.1% | **0.0%** |
+| **total** | **1,027** | **130,413** | **83.7%** | **5.0%** | **2.4%** | **8.8%** |
+
+`mexico-earthquake` is the obvious pick for an earthquake project and it is a trap: the 2017
+Puebla event damaged few structures inside the imaged footprint, leaving **3 destroyed
+buildings in the entire event**. A classifier cannot learn a class from 3 examples, and a model
+that answers `no-damage` unconditionally scores 99.4% on it.
+
+So it is held out, not trained on — see `config/paths.yaml` `xbd.holdout_events`. It is the
+only earthquake in the pool, which makes it the right *evaluation* set for seismic transfer
+and the number to quote for Nepal.
+
+The three training events were picked to cover the classes mexico cannot:
+- **hurricane-michael** is the only real source of `minor-damage` (6,271 of 6,562 total).
+- **palu-tsunami** and **santa-rosa-wildfire** supply `destroyed` (10,611 between them).
+
+Dropping any one of the three collapses a class. They are not interchangeable.
+
+Mixing disaster types is deliberate. The classifier reads structural change between the pre
+and post chip, and a collapsed roof looks similar whatever caused it. The cost of that
+assumption is measured, not assumed: `python -m ml.evaluate` reports the macro-F1 drop from
+the test set to the earthquake hold-out.
+
+### Not available here
+
+`joplin-tornado`, `nepal-flooding` and the other tier3 events are absent from this mirror,
+which carries only train and test. If you want tier3, it is on `hannan022/xview2-xbd` — but
+note that mirror stores **rasterised masks, not polygon GeoJSON**, so `ml/datasets/xbd.py`
+cannot read it without a rewrite.
+
+### Re-downloading
+
+```bash
+bash scripts/fetch_xbd.sh                      # all four events, resumable
+bash scripts/fetch_xbd.sh hurricane-matthew    # add another event
+```
+
+HuggingFace rate-limits this (HTTP 429). The script caps itself at 6 parallel connections
+with retries; raising that makes it fail, not finish faster. A full pull takes ~20 minutes.
+
+- Paired pre/post 1024x1024 RGB tiles.
+- Damage labels: `no-damage`, `minor-damage`, `major-damage`, `destroyed` (plus
+  `un-classified`, which chip extraction skips).
+- **License: CC BY-NC-SA 4.0 — non-commercial.** Credit it on the demo slide.
 
 ## 2-4. Nepal layers via Overpass (automated)
 

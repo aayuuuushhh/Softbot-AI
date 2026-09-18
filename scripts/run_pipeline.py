@@ -25,12 +25,16 @@ def check() -> int:
     """Readiness report. Run this before you start debugging why nothing works."""
     paths = paths_config()
     required = [
-        ("xBD images", resolve(paths["xbd"]["images"]), "data/README.md section 1"),
-        ("xBD labels", resolve(paths["xbd"]["labels"]), "data/README.md section 1"),
+        ("xBD train images", resolve(paths["xbd"]["train"]) / "images", "data/README.md section 1"),
+        ("xBD train labels", resolve(paths["xbd"]["train"]) / "labels", "data/README.md section 1"),
+        ("xBD test images", resolve(paths["xbd"]["test"]) / "images", "data/README.md section 1"),
+        ("xBD test labels", resolve(paths["xbd"]["test"]) / "labels", "data/README.md section 1"),
         ("Ward boundaries", resolve(paths["nepal"]["wards"]), "data/README.md section 2"),
         ("Facilities", resolve(paths["nepal"]["facilities"]), "data/README.md section 3"),
         ("Population raster", resolve(paths["nepal"]["population"]), "data/README.md section 4"),
-        ("Chip manifest", resolve(paths["processed"]["manifest"]), "run with --prepare"),
+        ("Chip manifest (train)", resolve(paths["processed"]["manifest"]), "run with --prepare"),
+        ("Chip manifest (test)", resolve(paths["processed"]["manifest_test"]), "run with --prepare"),
+        ("Chip manifest (holdout)", resolve(paths["processed"]["manifest_holdout"]), "run with --prepare"),
         ("Model checkpoint", resolve(paths["model"]["checkpoint"]), "python -m ml.train"),
     ]
 
@@ -40,7 +44,7 @@ def check() -> int:
             print(f"  [ok]      {name}")
         else:
             missing += 1
-            print(f"  [missing] {name:<18} -> {hint}")
+            print(f"  [missing] {name:<24} -> {hint}")
 
     print()
     if missing:
@@ -51,27 +55,78 @@ def check() -> int:
     return 0 if missing == 0 else 1
 
 
+def _report(label: str, manifest, counts: dict) -> None:
+    total = sum(counts.values()) or 1
+    print(f"\n{label}: {total} chips -> {manifest}")
+    for name, count in counts.items():
+        print(f"  {name:<14} {count:>7}  ({100 * count / total:5.1f}%)")
+
+
 def prepare() -> int:
+    """Extract chips into three manifests: train, held-out test, held-out earthquake.
+
+    The split matters more than it looks. Training and test come from xBD's own train/test
+    division of the same three events, so `manifest_test` measures generalisation to unseen
+    tiles. `manifest_holdout` is mexico-earthquake, an event the model never sees at all -
+    it is the only earthquake in the pool and the closest proxy for Nepal, so it is the
+    number to quote when asked how this performs on seismic damage.
+    """
     from ml.datasets.xbd import class_counts, extract_chips
 
     paths = paths_config()
-    xbd_root = resolve(paths["xbd"]["root"])
-    if not xbd_root.exists():
-        print(f"No xBD data at {xbd_root}. See data/README.md section 1.")
+    chips_root = resolve(paths["processed"]["chips"])
+    train_events = paths["xbd"]["train_events"]
+    holdout_events = paths["xbd"]["holdout_events"]
+
+    jobs = [
+        ("train",   paths["xbd"]["train"], train_events,   paths["processed"]["manifest"]),
+        ("test",    paths["xbd"]["test"],  train_events,   paths["processed"]["manifest_test"]),
+        ("holdout", paths["xbd"]["train"], holdout_events, paths["processed"]["manifest_holdout"]),
+    ]
+
+    missing = [name for name, root, _, _ in jobs if not resolve(root).exists()]
+    if missing:
+        print(f"No xBD data at {resolve(paths['xbd']['root'])}. See data/README.md section 1.")
         return 1
 
-    out_dir = resolve(paths["processed"]["chips"])
-    print(f"Extracting chips from {xbd_root} -> {out_dir}")
-    manifest = extract_chips(xbd_root, out_dir)
+    summary = {}
+    for name, root, events, manifest_key in jobs:
+        out_dir = chips_root / name
+        manifest = resolve(manifest_key)
+        print(f"\nExtracting {name} chips ({', '.join(events)}) -> {out_dir}")
+        extract_chips(resolve(root), out_dir, disasters=events, manifest_path=manifest)
+        summary[name] = (manifest, class_counts(manifest))
 
-    counts = class_counts(manifest)
-    total = sum(counts.values()) or 1
-    print(f"\n{total} chips -> {manifest}")
-    print("class balance:")
-    for name, count in counts.items():
-        print(f"  {name:<14} {count:>7}  ({100 * count / total:5.1f}%)")
-    print("\nThis imbalance is why train.py uses class-weighted loss and an oversampling sampler.")
+    # The holdout is train-split mexico only; add its test-split tiles so the eval set is whole.
+    holdout_manifest = resolve(paths["processed"]["manifest_holdout"])
+    extract_chips(
+        resolve(paths["xbd"]["test"]), chips_root / "holdout",
+        disasters=holdout_events, manifest_path=chips_root / "_holdout_test.csv",
+    )
+    _merge_manifests(holdout_manifest, chips_root / "_holdout_test.csv")
+    (chips_root / "_holdout_test.csv").unlink(missing_ok=True)
+    from ml.datasets.xbd import class_counts as _cc
+    summary["holdout"] = (holdout_manifest, _cc(holdout_manifest))
+
+    for name, (manifest, counts) in summary.items():
+        _report(name, manifest, counts)
+
+    print("\nTrain on the first manifest; the other two are never seen during fitting:")
+    print("  python -m ml.train --manifest data/processed/manifest.csv --epochs 8")
     return 0
+
+
+def _merge_manifests(base, extra) -> None:
+    """Append `extra`'s rows onto `base`, keeping a single header."""
+    import csv
+
+    with open(extra) as f:
+        rows = list(csv.DictReader(f))
+    if not rows:
+        return
+    with open(base, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+        writer.writerows(rows)
 
 
 def assess(args) -> int:

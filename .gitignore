@@ -2,6 +2,9 @@
 data/raw/
 data/interim/
 data/processed/
+# transfer archive for training on another machine - 4.5 GB, never commit
+data/*.tar
+data/*.tar.*
 data/nepal/
 !data/**/.gitkeep
 
