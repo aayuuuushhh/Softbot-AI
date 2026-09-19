@@ -27,10 +27,36 @@ from sklearn.metrics import classification_report, confusion_matrix, f1_score
 from torch.utils.data import DataLoader
 
 from .datasets.xbd import XBDChipDataset, class_counts
-from .models.siamese import DAMAGE_CLASSES, load_checkpoint
+from .models.siamese import DAMAGE_CLASSES, load_checkpoint, prior_logit_shift
 
 
-def evaluate_manifest(model, manifest: Path, device: str, batch_size: int, workers: int) -> dict:
+def resolve_prior(spec: str | None, manifest: Path,
+                  strength: float = 1.0) -> tuple[torch.Tensor | None, str]:
+    """`--prior` -> a logit shift, plus a label saying where the numbers came from.
+
+    `manifest` uses the evaluation set's own class balance. That is an *oracle*: it reads the
+    labels being scored, so it is an upper bound on what the correction can buy, never a
+    number to deploy on. A hand-set prior is the honest one - it is a claim about the region
+    you are flying over, made before you see the answers.
+    """
+    if spec is None:
+        return None, "none (model's uniform training prior)"
+    if spec == "manifest":
+        counts = class_counts(manifest)
+        total = sum(counts.values()) or 1
+        shares = ", ".join(f"{c}={counts[c] / total:.3f}" for c in DAMAGE_CLASSES)
+        shift, label = prior_logit_shift(counts), f"manifest ORACLE - upper bound only ({shares})"
+    else:
+        values = [float(v) for v in spec.split(",")]
+        shift, label = prior_logit_shift(values), f"fixed {values}"
+    # Partial strength interpolates between the training prior (0.0) and the stated one (1.0).
+    # Full strength optimises accuracy and is usually far too aggressive for triage, where
+    # missing a destroyed building costs more than another false alarm - see ml/prior_sweep.py.
+    return shift * strength, f"{label} @ strength {strength:g}"
+
+
+def evaluate_manifest(model, manifest: Path, device: str, batch_size: int, workers: int,
+                      logit_shift: torch.Tensor | None = None) -> dict:
     dataset = XBDChipDataset(manifest, augment=False)
     if len(dataset) == 0:
         return {"chips": 0}
@@ -43,7 +69,7 @@ def evaluate_manifest(model, manifest: Path, device: str, batch_size: int, worke
     predictions: list[int] = []
     targets: list[int] = []
     for pre, post, label in loader:
-        predicted, _ = model.predict(pre.to(device), post.to(device))
+        predicted, _ = model.predict(pre.to(device), post.to(device), logit_shift)
         predictions.extend(predicted.cpu().tolist())
         targets.extend(label.tolist())
 
@@ -102,6 +128,14 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--device", default=None)
+    parser.add_argument("--prior", default=None,
+                        help="Re-base the class prior before argmax. Either four comma-separated "
+                             "weights in DAMAGE_CLASSES order (e.g. '0.95,0.03,0.01,0.01') or "
+                             "'manifest' to use the eval set's own balance - the latter reads the "
+                             "labels it is scoring, so treat it as an upper bound, not a result.")
+    parser.add_argument("--prior-strength", type=float, default=1.0,
+                        help="How far to move toward --prior (0 = off, 1 = all the way). "
+                             "Pick it with ml/prior_sweep.py, not by eye.")
     args = parser.parse_args()
 
     if not args.checkpoint.exists():
@@ -126,7 +160,10 @@ def main() -> None:
             print(f"\n[skip] {label}: no manifest at {manifest} "
                   "(run `python scripts/run_pipeline.py --prepare`)")
             continue
-        result = evaluate_manifest(model, manifest, device, args.batch_size, args.workers)
+        shift, prior_label = resolve_prior(args.prior, manifest, args.prior_strength)
+        print(f"\n[{label}] prior: {prior_label}")
+        result = evaluate_manifest(model, manifest, device, args.batch_size, args.workers, shift)
+        result["prior"] = prior_label
         print_result(label, manifest, result)
         summary[manifest.stem] = {k: v for k, v in result.items() if not k.startswith("_")}
 

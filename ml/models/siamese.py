@@ -54,9 +54,16 @@ class SiameseDamageNet(nn.Module):
         return self.head(combined)
 
     @torch.no_grad()
-    def predict(self, pre: torch.Tensor, post: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Returns (class indices, confidence)."""
-        probabilities = torch.softmax(self(pre, post), dim=1)
+    def predict(self, pre: torch.Tensor, post: torch.Tensor,
+                logit_shift: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+        """Returns (class indices, confidence).
+
+        `logit_shift` re-bases the model's class prior - see `prior_logit_shift`.
+        """
+        logits = self(pre, post)
+        if logit_shift is not None:
+            logits = logits + logit_shift.to(logits.device)
+        probabilities = torch.softmax(logits, dim=1)
         confidence, predicted = probabilities.max(dim=1)
         return predicted, confidence
 
@@ -70,6 +77,44 @@ def class_weights_from_counts(counts: dict[str, int]) -> torch.Tensor:
     totals = torch.tensor([max(counts.get(c, 0), 1) for c in DAMAGE_CLASSES], dtype=torch.float)
     weights = totals.sum() / (len(DAMAGE_CLASSES) * totals)
     return weights
+
+
+def prior_logit_shift(
+    target_prior: dict[str, float] | list[float],
+    train_prior: dict[str, float] | list[float] | None = None,
+) -> torch.Tensor:
+    """Correct for a training prior that does not match the deployment base rate.
+
+    Training with a class-balanced sampler shows the model four equally likely classes, so it
+    learns p(class | image) under a *uniform* prior. Point it at a real region, where ~99% of
+    buildings are undamaged, and that mismatch alone manufactures false `destroyed` calls -
+    no matter how good the features are.
+
+    Adding `log(target) - log(train)` to the logits before the softmax is the standard fix: it
+    swaps one prior for the other and leaves the learned evidence untouched. It changes no
+    weights and needs no retraining.
+
+    `train_prior=None` means uniform, which is what `--balance sampler` produces.
+    """
+
+    def as_vector(value, default=None) -> torch.Tensor:
+        if value is None:
+            return default
+        if isinstance(value, dict):
+            value = [value.get(c, 0.0) for c in DAMAGE_CLASSES]
+        vector = torch.tensor(value, dtype=torch.float)
+        if vector.numel() != NUM_CLASSES:
+            raise ValueError(f"prior needs {NUM_CLASSES} values, got {vector.numel()}")
+        if (vector < 0).any() or vector.sum() <= 0:
+            raise ValueError(f"prior must be non-negative and sum above zero, got {value}")
+        return vector / vector.sum()
+
+    uniform = torch.full((NUM_CLASSES,), 1.0 / NUM_CLASSES)
+    target = as_vector(target_prior)
+    source = as_vector(train_prior, default=uniform)
+    # A zero in either prior would send a logit to -inf; floor it instead so the class stays
+    # reachable and the shift stays finite.
+    return torch.log(target.clamp_min(1e-8)) - torch.log(source.clamp_min(1e-8))
 
 
 def load_checkpoint(path: str, device: str = "cpu") -> SiameseDamageNet:
