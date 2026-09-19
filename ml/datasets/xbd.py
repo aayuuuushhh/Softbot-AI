@@ -171,16 +171,38 @@ def to_tensor(image: Image.Image) -> torch.Tensor:
     return torch.from_numpy(array.transpose(2, 0, 1))
 
 
+def to_uint8_tensor(image: Image.Image) -> torch.Tensor:
+    """Un-normalised CHW uint8 - a quarter the bytes of `to_tensor`.
+
+    Training hands these to the GPU and normalises there (`normalise_batch`). At batch 256 a
+    float32 pre/post pair is 96 MB in every worker's prefetch queue; uint8 makes it 24 MB,
+    which is the difference between fitting in RAM and meeting the OOM killer.
+    """
+    array = np.asarray(image, dtype=np.uint8)
+    return torch.from_numpy(np.ascontiguousarray(array.transpose(2, 0, 1)))
+
+
+def normalise_batch(batch: torch.Tensor) -> torch.Tensor:
+    """uint8 (B,3,H,W) -> ImageNet-normalised float. Mirrors `to_tensor` exactly."""
+    mean = torch.as_tensor(IMAGENET_MEAN, device=batch.device).view(1, 3, 1, 1)
+    std = torch.as_tensor(IMAGENET_STD, device=batch.device).view(1, 3, 1, 1)
+    return (batch.float().div_(255.0) - mean) / std
+
+
 class XBDChipDataset(Dataset):
     """Augmentations are applied *identically* to the pre and post chip - flip one and not the
     other and you have invented damage that isn't there."""
 
-    def __init__(self, manifest_path: Path, chip_ids: list[str] | None = None, augment: bool = False):
+    def __init__(self, manifest_path: Path, chip_ids: list[str] | None = None,
+                 augment: bool = False, as_uint8: bool = False):
         with open(manifest_path) as f:
             rows = [ChipRecord(**row) for row in csv.DictReader(f)]
         allowed = set(chip_ids) if chip_ids is not None else None
         self.records = [r for r in rows if allowed is None or r.chip_id in allowed]
         self.augment = augment
+        # Callers that normalise on the GPU (training) set this; evaluate.py and infer.py
+        # want ready-to-use float tensors and leave it off.
+        self.as_uint8 = as_uint8
 
     def __len__(self) -> int:
         return len(self.records)
@@ -193,7 +215,8 @@ class XBDChipDataset(Dataset):
         if self.augment:
             pre, post = self._augment(pre, post)
 
-        return to_tensor(pre), to_tensor(post), CLASS_TO_INDEX[record.damage_class]
+        convert = to_uint8_tensor if self.as_uint8 else to_tensor
+        return convert(pre), convert(post), CLASS_TO_INDEX[record.damage_class]
 
     def _augment(self, pre: Image.Image, post: Image.Image):
         import random

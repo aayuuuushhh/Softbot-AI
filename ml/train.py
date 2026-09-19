@@ -22,7 +22,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
-from .datasets.xbd import XBDChipDataset, class_counts
+from .datasets.xbd import XBDChipDataset, class_counts, normalise_batch
 from .models.siamese import DAMAGE_CLASSES, SiameseDamageNet, class_weights_from_counts
 
 
@@ -66,8 +66,10 @@ def run_epoch(model, loader, criterion, optimizer, device, train: bool, amp: boo
     autocast = torch.autocast("cuda", dtype=torch.bfloat16, enabled=amp and device == "cuda")
 
     for pre, post, label in tqdm(loader, leave=False, desc="train" if train else "val"):
-        pre = pre.to(device, non_blocking=True, memory_format=torch.channels_last)
-        post = post.to(device, non_blocking=True, memory_format=torch.channels_last)
+        # Chips arrive as uint8 and are normalised here: 4x less to hold in the worker
+        # queues and 4x less to copy over PCIe than shipping float32 from the workers.
+        pre = normalise_batch(pre.to(device, non_blocking=True)).to(memory_format=torch.channels_last)
+        post = normalise_batch(post.to(device, non_blocking=True)).to(memory_format=torch.channels_last)
         label = label.to(device, non_blocking=True)
 
         with torch.set_grad_enabled(train), autocast:
@@ -104,6 +106,9 @@ def main() -> None:
                              "ImageNet features at the head's LR destroys them in one epoch.")
     parser.add_argument("--val-fraction", type=float, default=0.2)
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--prefetch", type=int, default=2,
+                        help="Batches each worker queues ahead. RAM scales as "
+                             "workers * prefetch * batch-size; raise only if the GPU starves.")
     parser.add_argument("--seed", type=int, default=2015)
     parser.add_argument("--label-smoothing", type=float, default=0.05)
     parser.add_argument("--amp", action="store_true",
@@ -134,26 +139,37 @@ def main() -> None:
     print("class balance:", counts)
 
     train_ids, val_ids = split_by_tile(args.manifest, args.val_fraction, args.seed)
-    train_set = XBDChipDataset(args.manifest, train_ids, augment=True)
-    val_set = XBDChipDataset(args.manifest, val_ids, augment=False)
+    train_set = XBDChipDataset(args.manifest, train_ids, augment=True, as_uint8=True)
+    val_set = XBDChipDataset(args.manifest, val_ids, augment=False, as_uint8=True)
     print(f"train chips: {len(train_set)}  val chips: {len(val_set)}")
 
     use_sampler = args.balance in ("sampler", "both")
     use_loss_weights = args.balance in ("loss", "both")
     print(f"balancing: {args.balance}  (sampler={use_sampler}, loss-weights={use_loss_weights})")
 
-    loader_kwargs = dict(
-        num_workers=args.workers, pin_memory=(device == "cuda"),
-        persistent_workers=args.workers > 0, prefetch_factor=4 if args.workers > 0 else None,
-    )
+    # Both loaders' workers are alive at once, so the RAM ceiling is the SUM of the two
+    # queues. Val gets a small, non-persistent pool: it runs once per epoch and does not
+    # need to be kept warm, and keeping 12 idle val workers resident is what invites the
+    # OOM killer partway through a long run.
+    val_workers = min(4, args.workers)
+    common = dict(pin_memory=(device == "cuda"))
     train_loader = DataLoader(
         train_set, batch_size=args.batch_size,
         sampler=make_sampler(train_set) if use_sampler else None,
-        shuffle=not use_sampler, drop_last=True, **loader_kwargs,
+        shuffle=not use_sampler, drop_last=True,
+        num_workers=args.workers, persistent_workers=args.workers > 0,
+        prefetch_factor=args.prefetch if args.workers > 0 else None, **common,
     )
     val_loader = DataLoader(
-        val_set, batch_size=args.batch_size * 2, shuffle=False, **loader_kwargs,
+        val_set, batch_size=args.batch_size, shuffle=False,
+        num_workers=val_workers, persistent_workers=False,
+        prefetch_factor=args.prefetch if val_workers > 0 else None, **common,
     )
+
+    per_batch_mb = args.batch_size * 2 * 3 * 128 * 128 / 1024 ** 2  # uint8 pre+post
+    queued = (args.workers + val_workers) * args.prefetch * per_batch_mb
+    print(f"loader queues: ~{queued / 1024:.1f} GB peak "
+          f"({args.workers}+{val_workers} workers x {args.prefetch} x {per_batch_mb:.0f} MB)")
 
     model = SiameseDamageNet(freeze_backbone=args.freeze_backbone).to(device)
     model = model.to(memory_format=torch.channels_last)
