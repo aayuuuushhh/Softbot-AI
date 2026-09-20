@@ -317,6 +317,7 @@ uddhar/
   config/
     pipeline.yaml         thresholds, kernel sizes, channel weights
     standards.yaml        Sphere constants, household sizes, WITH SOURCES
+    agents.yaml           A1/A2 enable flags, thresholds, model selection
   core/
     registration.py       S1
     illumination.py       S2  (slope-aspect banding)
@@ -331,6 +332,19 @@ uddhar/
     schema.sql
     store.py              SQLite access, offline-safe writes
     sync.py               last-write-wins reconciliation
+  agents/
+    runtime.py            model loading, offline/online selection, disable switch
+    a1_reconcile/
+      parse.py            document → text blocks
+      extract.py          structured extraction
+      gazetteer.py        Nepali place-name resolution
+      units.py            unit + commodity normalisation
+      dedup.py            matching against existing records
+      review.py           human review queue
+    a2_standards/
+      corpus.py           local corpus index build + load
+      retrieve.py         passage retrieval
+      advise.py           recommendation assembly with citations
   api/
     main.py               FastAPI
     routes/
@@ -343,6 +357,8 @@ uddhar/
     fixtures/             including the undamaged-hillside regression pair
   data/
     demo/                 seeded ledger CSV, demo image pairs
+    gazetteer/            ward gazetteer with alternate spellings
+    standards_corpus/     Sphere, INSARAG, IFRC/UNDAC + manifest.yaml
 ```
 
 ---
@@ -362,6 +378,8 @@ uddhar/
 | Packaging | Docker + a plain `pip install -e .` path | Must be installable without Docker on a field laptop |
 
 **Do not add:** PyTorch, TensorFlow, any cloud SDK, any service requiring network at runtime.
+
+> Agent-layer additions to this stack are listed in §11.5 and are subject to the same rules. They are optional dependencies behind an extra (`pip install -e ".[agents]"`), never required for the core pipeline to run.
 
 ---
 
@@ -395,6 +413,8 @@ Validation is a deliverable, not an afterthought. A triage system with unstated 
 
 Publish failure modes including negative results. A project that characterises where it breaks on real Nepali terrain is more credible than one showing clean results on American suburbs.
 
+> Agent-layer tests are specified in §11.6. The entire suite above must pass with `agents.enabled: false`.
+
 ---
 
 ## 9. Out of scope for Phase 1
@@ -407,11 +427,13 @@ Do not build these. If a request arrives that implies one, say so and point here
 | Full routing / travel-time estimation | S6 emits a flag, not a route. Routing is Phase 2. |
 | T+20min ShakeMap prediction layer | Strong idea, earthquake-only. The anchoring event is a flood; adding it fragments the story. Phase 2. |
 | SAR / monsoon flood mapping | Different sensor, different processing chain entirely. Separate project. |
-| Deep learning models | Breaks the CPU-only and offline constraints, which are the deployment argument. |
+| Deep learning models | Breaks the CPU-only and offline constraints, which are the deployment argument. Applies to the *core pipeline*; the §11 agent layer uses language models under the guardrails stated there and never inside S1–S8. |
 | LLM in the decision path | Nothing generative touches damage classification, need computation or gap arithmetic. If a narrative brief is added later, the model phrases pipeline facts and injects no entities of its own. |
-| Agent orchestration | If any agentic surface is added, it is an MCP server wrapping existing deterministic tools. Nothing more. |
-| Multi-agent deliberation | Theatre. Deterministic answers already exist. |
+| ~~Agent orchestration~~ **[CHANGED — see note below]** | Superseded by §11. Two agents are in scope: A1 (ledger reconciliation) and A2 (standards advisor). Both sit outside the deterministic core, are individually disableable, and may not write to core artefacts. Anything beyond A1 and A2 remains out of scope. |
+| Multi-agent deliberation | Theatre. Deterministic answers already exist. A1 and A2 do not converse, negotiate, or review each other's output. |
 | Public accusation features | The system reports `unconfirmed`. It does not allege. |
+
+> **Note on the changed row.** The original text read: *"Agent orchestration — If any agentic surface is added, it is an MCP server wrapping existing deterministic tools. Nothing more."* That line directly forbade A1 and A2, so it has been superseded rather than left to contradict §11. Everything else in this document is unchanged. The MCP server described there is still a valid optional surface and is retained as §11.7.
 
 ---
 
@@ -430,3 +452,270 @@ Step 5 is the entire pitch in one screen. Every engineering decision should be c
 Closing line for the slide:
 
 > Nobody could check whether aid reached the right place, because nobody had an independent measure of what the right amount was. Uddhar computes it from imagery — so the comparison becomes possible for the first time.
+
+> Two optional demo steps sit after step 5. See §11.8.
+
+---
+
+## 11. The agentic layer
+
+Two agents. They sit **around** the deterministic core, never inside it.
+
+They are not Phase 1 features — §4 still holds, and the four features must ship and pass their tests with the agent layer entirely disabled. The agents make the core easier to feed and easier to interpret. They never change what it computes.
+
+### 11.0 The governing rule
+
+> **Agents ingest, normalise and cite. They never classify damage, compute need, or do gap arithmetic.**
+
+That separation is the whole accountability argument. A number that changes between runs is a number nobody should act on. S1–S8 stay deterministic so that every figure in the undelivered list is reproducible and defensible; if an agent could alter which ward appears at the top of that list, the list stops being evidence.
+
+Say this out loud in any presentation. Demonstrating you understand where a language model must *not* go is a stronger signal than demonstrating you can put one somewhere.
+
+---
+
+### 11.1 A1 — Ledger reconciliation agent
+
+**The problem it solves.** F1 and F2 run on data Uddhar generates. F3 depends on delivery records that arrive as a mess: agency situation-report PDFs, operational bulletins, army press releases stating tonnage, NDRRMA spreadsheets, shipment manifests. Different formats, units, languages, and place-name spellings. Today a human would have to read all of it and hand-type it into a ledger. Nobody does. That is precisely why no shared view of delivery has ever existed.
+
+**What it does.** Ingests heterogeneous delivery documents and normalises them into the `consignment` and `handover` schema, with provenance and confidence attached to every record.
+
+#### Pipeline
+
+```
+document → parse → extract candidates → resolve place → normalise units
+         → dedup against ledger → confidence gate → commit | review queue | discard
+```
+
+#### Tools
+
+| Tool | Signature | Notes |
+| --- | --- | --- |
+| `parse_document` | `(path) -> TextBlock[]` | PDF, DOCX, XLSX, CSV, HTML. Deterministic, no model. Preserves page/sheet/row for excerpt citation. |
+| `extract_consignments` | `(TextBlock[]) -> Candidate[]` | Structured extraction. Model returns JSON only, schema-validated before it goes anywhere. |
+| `resolve_place` | `(name, context) -> (zone_id, confidence)` | Gazetteer lookup. See 11.1.1. |
+| `normalise_units` | `(quantity, unit, commodity) -> Canonical \| Unmappable` | See 11.1.2. |
+| `find_matching_record` | `(Candidate) -> consignment_id \| None` | Dedup on agency + commodity + zone + date window. |
+| `stage_for_review` | `(Candidate, confidence, reason) -> review_id` | Human queue. |
+| `commit_record` | `(Candidate) -> consignment_id` | Only above the auto-commit threshold. |
+
+#### 11.1.1 Place-name resolution — the hard part
+
+This is where A1 will actually fail, so build it carefully.
+
+Nepali place names vary in transliteration (Uttargaya / Uttargayā / उत्तरगया), carry optional suffixes (Dhunche vs Dhunche Bazar), repeat across districts, and appear with or without ward numbers. A document saying "relief delivered to Rasuwa" resolves to a district, not a zone, and must not be silently assigned to one.
+
+- Build `data/gazetteer/` from ward boundaries plus OSM `name`, `name:ne`, `alt_name` and `old_name` tags.
+- Match with normalised Unicode, then fuzzy match (token set ratio), then disambiguate using district context from elsewhere in the document.
+- **Granularity gate:** if the resolved entity is coarser than a ward, do not assign a `zone_id`. Emit `resolution_granularity: 'district'` and send to review. Attributing a district-level delivery to one ward would corrupt the gap arithmetic — the exact failure the project exists to prevent.
+
+#### 11.1.2 Unit and commodity normalisation
+
+Real reports say things like "eight tonnes of relief supplies" or "kits for 19,000 people". Neither maps cleanly to a commodity quantity.
+
+- Where the commodity is explicit and the unit convertible, convert and record both original and canonical values.
+- Where the commodity is a mixed or unspecified bundle, set `commodity: 'mixed'` and `quantity_unmappable: true`. **Do not guess a breakdown.** An unmappable record still has value — it proves something was dispatched — and it must not enter the per-commodity gap calculation.
+- Where a figure is expressed as beneficiaries rather than units ("supplies for 19,000 people"), store it as `beneficiary_count` and leave commodity quantities null.
+
+#### 11.1.3 Confidence gates
+
+| Extraction confidence | Action |
+| --- | --- |
+| `≥ 0.85` **and** place resolved to ward granularity | Auto-commit with provenance |
+| `0.60 – 0.85`, or coarser place granularity, or unmappable units | Human review queue |
+| `< 0.60` | Discard, log with source reference |
+
+Thresholds live in `config/agents.yaml`. Auto-commit may be globally disabled — a deploying institution may reasonably require every record to be reviewed.
+
+#### 11.1.4 Provenance — additive schema
+
+A1 requires provenance columns and a review queue. This is **additive**; the §4 schema is unchanged.
+
+```sql
+-- Additive migration. Existing columns and semantics untouched.
+ALTER TABLE consignment ADD COLUMN source_document TEXT;
+ALTER TABLE consignment ADD COLUMN source_excerpt  TEXT;
+ALTER TABLE consignment ADD COLUMN extracted_by    TEXT;   -- 'human' | 'A1'
+ALTER TABLE consignment ADD COLUMN extraction_model TEXT;  -- model id + version
+ALTER TABLE consignment ADD COLUMN extraction_confidence REAL;
+ALTER TABLE consignment ADD COLUMN reviewed_by     TEXT;
+ALTER TABLE consignment ADD COLUMN reviewed_at     TEXT;
+
+ALTER TABLE handover ADD COLUMN source_document TEXT;
+ALTER TABLE handover ADD COLUMN source_excerpt  TEXT;
+ALTER TABLE handover ADD COLUMN extracted_by    TEXT;
+ALTER TABLE handover ADD COLUMN extraction_model TEXT;
+ALTER TABLE handover ADD COLUMN extraction_confidence REAL;
+ALTER TABLE handover ADD COLUMN reviewed_by     TEXT;
+ALTER TABLE handover ADD COLUMN reviewed_at     TEXT;
+
+CREATE TABLE review_queue (
+  id            TEXT PRIMARY KEY,
+  candidate     TEXT NOT NULL,      -- JSON blob of the extracted candidate
+  reason        TEXT NOT NULL,      -- 'low_confidence' | 'coarse_place' | 'unmappable_units' | 'possible_duplicate'
+  confidence    REAL,
+  source_document TEXT NOT NULL,
+  source_excerpt  TEXT,
+  created_at    TEXT NOT NULL,
+  resolved_at   TEXT,
+  resolution    TEXT                -- 'accepted' | 'rejected' | 'edited'
+);
+```
+
+Any record with `extracted_by = 'A1'` and `reviewed_by IS NULL` must render distinctly in the UI. A coordinator should always be able to see which numbers a machine put there.
+
+#### 11.1.5 Hard limits
+
+- A1 writes **only** to `consignment`, `handover` and `review_queue`. Never to `needs.json`, `gaps.json`, `structures.geojson`, or any run artefact.
+- A1 never invents a quantity, a date, a commodity or a zone. Every field traces to a `source_excerpt`.
+- A1 requires network access to fetch documents and may require it for model inference. **The core pipeline must never depend on A1.** With A1 offline or disabled, F3 runs on whatever the ledger already holds.
+
+---
+
+### 11.2 A2 — Standards advisor agent
+
+**The problem it solves.** F2 tells a coordinator a zone needs 171 people's worth of shelter and water. It does not tell them what response capacity that implies — how many search-and-rescue personnel, what team classification, what sanitation provision.
+
+That information exists, and not in news reports. It is in humanitarian standards documents: the **Sphere Handbook** (minimum water, shelter, food and sanitation quantities), the **INSARAG Guidelines** (USAR team classification — light, medium, heavy — composition and worksite capacity), and **IFRC / UNDAC field handbooks** (assessment and deployment structures).
+
+**What it does.** Retrieval-augmented advice over a curated, locally cached corpus. Every recommendation carries a citation a coordinator can open.
+
+#### Why RAG over a fixed corpus, not web search
+
+An agent that searches the internet and concludes "a comparable event elsewhere needed 400 personnel, so this zone needs 250" produces a number that cannot be derived, audited, or reproduced — sitting in the same table as figures that can. It would undermine the project's strongest property.
+
+It also would not work: post-disaster reporting gives deaths, damage counts and funding appeals, but rarely states required team counts. Asking a model to infer a number absent from its sources is exactly when models invent.
+
+And it needs connectivity. A cached corpus does not, which is why A2 satisfies the offline constraint and a search agent could not.
+
+#### Tools
+
+| Tool | Signature | Notes |
+| --- | --- | --- |
+| `get_zone_profile` | `(zone_id) -> ZoneProfile` | Read-only view of damage counts, need and reachability. |
+| `retrieve_standard` | `(query, filters) -> Passage[]` | Local index. Each passage carries document, edition, section. |
+| `format_recommendation` | `(Passage[], ZoneProfile) -> Advice` | Assembles text plus a citation list. |
+
+Retrieval: sentence-transformers MiniLM exported to ONNX for CPU inference, with BM25 as a fallback so the system still functions if the embedding model is unavailable. Index built once at packaging time and shipped with the application.
+
+#### Corpus
+
+`data/standards_corpus/` with a `manifest.yaml` recording, per document: title, publisher, edition and year, licence or terms of use, and retrieval date. Include only documents whose licence permits redistribution, and where it does not, ship the index and cite the passage without reproducing the full text.
+
+#### Output contract
+
+```json
+{
+  "zone_id": "rasuwa-uttargaya-4",
+  "advice": [
+    {
+      "statement": "Collapse profile and structure count are consistent with a Medium USAR team deployment.",
+      "citations": [
+        {
+          "document": "INSARAG Guidelines Volume II, Manual A",
+          "edition": "2020",
+          "section": "USAR team classification",
+          "excerpt": "..."
+        }
+      ],
+      "confidence": 0.78
+    }
+  ],
+  "advisory_only": true
+}
+```
+
+#### Hard limits
+
+- **No recommendation without at least one citation.** If retrieval returns nothing above the relevance threshold, A2 says it has no applicable standard. It does not reason from general knowledge.
+- A2 **writes nothing**. Its output is rendered in a visually distinct advisory panel and is never merged into `needs.json` or `gaps.json`.
+- No figure produced by A2 enters the gap arithmetic. Ever.
+- A2 runs fully offline. If it cannot run offline, it is misbuilt.
+
+---
+
+### 11.3 What the agents do not do
+
+Beyond the per-agent limits, these apply to the layer as a whole. They are architectural, not stylistic.
+
+| Forbidden | Why |
+| --- | --- |
+| Touching the decision path | No agent participates in S1–S8. Damage, need and gap stay deterministic. |
+| Allocating or dispatching | No agent assigns teams, commits resources, or contacts anyone. Crossing into decision-making collapses the accountability argument in §1. |
+| Autonomous external action | No sending messages, filing requests, or calling third-party services that act on the world. Read and recommend only. |
+| Agent-to-agent conversation | A1 and A2 do not talk to each other. Deterministic answers already exist between them. |
+| Historical-incident quantity inference | No agent derives a required quantity by analogy to another country's disaster. See 11.2 for why. Qualitative lessons from a curated case library are permissible; numbers entering the need table are not. |
+| Alleging wrongdoing | A1 reports what a document said. The ledger column remains `unconfirmed`. §4's framing rule applies in full to agent-written records. |
+| Being required | The core must pass its full test suite with `agents.enabled: false`. |
+
+---
+
+### 11.4 Runtime and model selection
+
+`agents/runtime.py` owns model loading and must honour these rules:
+
+- **Global kill switch.** `agents.enabled: false` in `config/agents.yaml` disables both agents. The API keeps its shape; agent endpoints return `503 AGENTS_DISABLED`. Per-agent flags (`a1.enabled`, `a2.enabled`) are independent.
+- **Offline model path.** A quantised local model via `llama.cpp` bindings, CPU inference. This is the default for A2 and is what makes the offline guarantee real.
+- **Online model path.** Optional for A1, where documents are being fetched anyway. Selected only when `agents.allow_remote: true` **and** connectivity is confirmed. Never assumed.
+- **Degradation is loud.** If a model cannot load, emit `AGENT_MODEL_UNAVAILABLE`, disable that agent, show it in the UI, and continue. Never fall back to a different model silently.
+- **Record the model.** Every agent-written record stores the model id and version in `extraction_model`. Reproducibility of a machine-written record means knowing what wrote it.
+- **Timeouts and caps.** Per-document time limit, per-run token cap, maximum documents per batch. All in config. An agent must not be able to stall a response.
+
+---
+
+### 11.5 Agent-layer dependencies
+
+Optional extra, installed via `pip install -e ".[agents]"`. The core installs and runs without these.
+
+| Purpose | Choice |
+| --- | --- |
+| Document parsing | `pdfplumber`, `python-docx`, `openpyxl`, `beautifulsoup4` |
+| Local inference | `llama-cpp-python` (CPU build) |
+| Embeddings | `onnxruntime` + exported MiniLM; `rank_bm25` fallback |
+| Fuzzy matching | `rapidfuzz` |
+| Schema validation | `pydantic` |
+
+Still excluded, as §6 states: PyTorch, TensorFlow, and any cloud SDK in the core. The core's `pip install -e .` path must not pull any of the above.
+
+---
+
+### 11.6 Agent testing
+
+**Suite passes with agents off.** CI runs the full §8 suite with `agents.enabled: false` as a required job. If anything in §8 depends on an agent, that is a bug in the layering.
+
+**A1 — extraction fixtures.** Real published documents from the August 2026 response: a CARE bulletin, a UNICEF operational update, an NDRRMA spreadsheet, an army press release. Expected outputs hand-labelled. Report precision and recall per field (agency, commodity, quantity, zone, date). Collect these documents early; real inputs demo far better than synthetic ones.
+
+**A1 — place resolution.** A held-out set of Nepali place strings with known correct `zone_id`s, including deliberate transliteration variants, bazaar suffixes, and cross-district name collisions. Assert that district-level strings resolve to `resolution_granularity: 'district'` and are **never** assigned a ward.
+
+**A1 — no-invention property test.** For every field in every committed record, assert the value appears in or is derivable from `source_excerpt`. A record failing this is a hard failure, not a warning.
+
+**A1 — ledger isolation.** Attempt writes to core artefacts from within A1's code path; assert they are refused.
+
+**A2 — citation coverage.** Every `advice` entry has ≥1 citation resolving to a real corpus passage. Zero-citation output is a hard failure.
+
+**A2 — offline.** Run the A2 suite with the network interface down. Any failure means the offline guarantee is broken.
+
+**A2 — non-contamination.** Assert `needs.json` and `gaps.json` are byte-identical with A2 enabled and disabled.
+
+**Determinism boundary.** Run the full pipeline twice with agents enabled. `structures.geojson`, `needs.json` and `gaps.json` must be byte-identical across runs. Agent output may vary; core output may not.
+
+---
+
+### 11.7 Optional MCP surface
+
+Retained from the superseded §9 row. If exposed, the MCP server wraps **existing deterministic tools only**: `run_damage_analysis`, `get_zone_needs`, `get_undelivered`, `record_handover`, `set_road_blocked`, `query_zone`. It calls the same functions the API does, adds no reasoning of its own, and is subject to every limit in 11.3.
+
+This is a transport, not an agent. Build it only after A1 and A2 work.
+
+---
+
+### 11.8 Agents in the demo
+
+§10 steps 1–5 are unchanged and remain the pitch. These two steps are optional and come after:
+
+6. **A1.** Drop in a real agency situation-report PDF. It parses, extracts two consignments, resolves one to a ward and sends the other to review because the document named only a district. The ledger updates; the undelivered list re-ranks. Show the review queue — the point is that the machine knows what it does not know.
+
+7. **A2.** Click an advisory panel on the top-ranked zone. It returns the standards-based response profile with an open-able citation to Sphere or INSARAG.
+
+Line for the slide:
+
+> One agent reconciles what agencies reported delivering into a single ledger. One agent tells you what the standards say a zone of this profile requires, with the citation. Neither computes need and neither decides who gets rescued — those stay deterministic, because a number that changes between runs is a number nobody should act on.
