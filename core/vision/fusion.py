@@ -55,6 +55,10 @@ class ZoneDamage:
     ground_reports: int
     decided_by: str  # satellite | ground | fused | none
     damaged_area_m2: float = 0.0
+    # Share of the ward damaged, from overhead damaged area only (0-1). None when
+    # there is no overhead evidence. Severity can be overridden by a ground photo;
+    # extent cannot - one photo shows one building, not how much of the ward fell.
+    extent: float | None = None
     notes: list[str] = field(default_factory=list)
 
 
@@ -195,6 +199,7 @@ def fuse_zone(
         ground_reports=len(ground_reports),
         decided_by=decided_by,
         damaged_area_m2=round(damaged_area, 1),
+        extent=round(float(sat_score), 4) if inside else None,
         notes=notes,
     )
 

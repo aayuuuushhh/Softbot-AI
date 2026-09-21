@@ -242,6 +242,9 @@ def test_ground_overrides_satellite_when_they_disagree():
     assert result.decided_by == "ground"
     assert result.severity == Severity.DESTROYED
     assert any("overrode satellite" in n for n in result.notes)
+    # Severity comes from the photo; how much of the ward is damaged still
+    # comes from overhead.
+    assert result.extent is not None and result.extent < 1.0
 
 
 def test_heavy_cloud_collapses_satellite_confidence():
@@ -263,6 +266,12 @@ def test_ground_alone_carries_a_zone_with_no_overhead_coverage():
     assert result.decided_by == "ground"
     assert result.severity == Severity.DESTROYED
     assert result.confidence > 0.5
+
+
+def test_intact_ground_photo_does_not_raise_an_undamaged_zone():
+    result = fuse_zone("z1", ZONE_GEOMETRY, detections=[],
+                       ground_reports=[_ground(Severity.NONE, confidence=0.7)])
+    assert result.severity == Severity.NONE
 
 
 def test_no_evidence_yields_no_damage_not_a_guess():
