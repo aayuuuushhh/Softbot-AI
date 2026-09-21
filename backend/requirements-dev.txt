@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest==8.3.4
+# Read by ml/finetune/load_config.py, exercised in tests/test_finetune_config.py.
+pyyaml==6.0.2
