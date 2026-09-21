@@ -186,9 +186,13 @@ class Needs(Base):
     """Computed requirement for one zone (S4/S6)."""
 
     personnel: int = 0
-    food_rations: int = 0
-    water_litres: int = 0
+    food_rations: int = 0  # person-days of food
+    water_litres: int = 0  # per day
     medical_kits: int = 0
+    affected_people: int = 0
+    sku_demand: dict[str, int] = Field(default_factory=dict)
+    # {field: {value, formula, assumptions, sources}} - see core/needs.py
+    derivations: dict[str, Any] = Field(default_factory=dict)
 
 
 class Zone(ZoneCreate):
@@ -198,6 +202,8 @@ class Zone(ZoneCreate):
     buildings_destroyed: int = 0
     detections: int = 0
     decided_by: Literal["satellite", "ground", "fused", "none"] = "none"
+    damage_extent: float | None = Field(
+        default=None, description="Share of the ward damaged, from overhead imagery only")
     needs: Needs = Field(default_factory=Needs)
 
 
@@ -231,6 +237,9 @@ class GraphNodeCreate(Base):
     location: Point
     zone_id: PyObjectId | None = None
     capacity: int = 0
+    # A blocked node (collapsed bridge, cut-off village) is impassable by road:
+    # routing never traverses it, and delivers to it only by verified air.
+    status: Literal["open", "blocked"] = "open"
 
 
 class GraphNode(GraphNodeCreate):
@@ -248,6 +257,7 @@ class GraphEdgeCreate(Base):
 
 class GraphEdge(GraphEdgeCreate):
     id: PyObjectId = id_field()
+    blocked_reason: str | None = None
 
 
 # --------------------------------------------------------------------------
@@ -308,7 +318,8 @@ class DispatchOrder(Base):
     route: list[PyObjectId] = Field(
         default_factory=list, description="Node ids, origin -> destination"
     )
-    priority: int = Field(default=5, ge=1, le=10)
+    route_distance_km: float | None = None
+    priority: int = Field(default=5, ge=1, le=10, description="1 = most urgent")
     rationale: str
     # Structural enforcement of "Traceable AI": an uncited order cannot exist.
     citations: list[Citation] = Field(min_length=1)
@@ -328,6 +339,7 @@ class AllocationPlan(Base):
 class Dispatch(DispatchOrder):
     id: PyObjectId = id_field()
     event_id: PyObjectId
+    run_id: PyObjectId | None = Field(default=None, description="agent_runs entry that produced it")
     status: DispatchStatus = DispatchStatus.PROPOSED
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
