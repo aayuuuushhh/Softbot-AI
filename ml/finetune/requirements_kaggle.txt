@@ -1,0 +1,16 @@
+# Kaggle fine-tune deps (install after torch cu118 in notebook cell 2)
+# torch/torchvision: install separately with cu118 index for P100/T4 support
+
+pytorch-lightning==1.9.5
+torchmetrics>=0.11,<2
+torch-optimizer
+timm
+segmentation-models-pytorch
+albumentations
+opencv-python-headless
+pyyaml
+joblib
+tqdm
+shapely
+fire
+monai>=1.3,<2

@@ -1,0 +1,51 @@
+# Fine-tuning config — AMD Instinct GPU (ROCm), hackathon notebook.
+#
+# Mirrors config_subset_kaggle.yaml, with two deliberate differences:
+#   - Paths live under $WORK_ROOT (the notebook has no /kaggle mounts).
+#   - Epoch counts are cut to fit a single sitting. A model that finishes is
+#     worth more than a better one that is still training at the deadline;
+#     raise these if you have the GPU for longer.
+#
+# Override anything from the shell — load_config.py yields to a set env var:
+#   EPOCHS=8 bash ml/finetune/run_amd_notebook.sh --stage dmg
+
+data:
+  train_dir: ${WORK_ROOT}/data/train_subset
+  test_dir: ${WORK_ROOT}/data/test
+  results_root: ${WORK_ROOT}/results
+
+subset_prefixes:
+  - mexico-earthquake
+  - midwest-flooding
+  - socal-fire
+  - santa-rosa-wildfire
+
+localization:
+  type: pre
+  encoder: resnet50
+  loss_str: ce+dice
+  epochs: 3
+  batch_size: 16
+  val_batch_size: 16
+  num_workers: 8
+  gpus: 1
+  results_dir: ${WORK_ROOT}/results/loc
+
+damage:
+  type: post
+  dmg_model: siamese
+  encoder: resnet50
+  loss_str: focal+dice
+  epochs: 4
+  # MI300X carries 192 GB of HBM — far more headroom than the T4 this subset
+  # was tuned for. Batch 16 keeps the GPU busy; drop it if you hit an OOM.
+  batch_size: 16
+  val_batch_size: 16
+  num_workers: 8
+  precision: 32
+  gpus: 1
+  results_dir: ${WORK_ROOT}/results/dmg
+  ckpt_pre: ${WORK_ROOT}/results/loc/checkpoints/best.ckpt
+
+eval:
+  results_dir: ${WORK_ROOT}/results/eval

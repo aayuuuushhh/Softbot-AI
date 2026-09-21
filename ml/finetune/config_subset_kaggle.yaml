@@ -1,0 +1,46 @@
+# Fine-tuning config — Kaggle GPU (CUDA T4/P100)
+# Paths under /kaggle/working; override with env vars in run_kaggle_pipeline.sh
+#
+# Checkpointing (overrides/main.py):
+#   - val_check_interval=0.25 → F1 validate/save 4x per epoch
+#   - every_n_train_steps=400 → mid-epoch step-*.ckpt safety net
+# Prefer Kaggle "Save Version → Save & Run All" over interactive cell-by-cell.
+
+data:
+  train_dir: /kaggle/working/data/train_subset
+  test_dir: /kaggle/working/data/test
+  results_root: /kaggle/working/results
+
+subset_prefixes:
+  - mexico-earthquake
+  - midwest-flooding
+  - socal-fire
+  - santa-rosa-wildfire
+
+localization:
+  type: pre
+  encoder: resnet50
+  loss_str: ce+dice
+  epochs: 5
+  batch_size: 8
+  val_batch_size: 8
+  num_workers: 4
+  gpus: 1
+  results_dir: /kaggle/working/results/loc
+
+damage:
+  type: post
+  dmg_model: siamese
+  encoder: resnet50
+  loss_str: focal+dice
+  epochs: 5
+  batch_size: 4
+  val_batch_size: 4
+  num_workers: 0
+  precision: 32
+  gpus: 1
+  results_dir: /kaggle/working/results/dmg
+  ckpt_pre: /kaggle/working/results/loc/checkpoints/best.ckpt
+
+eval:
+  results_dir: /kaggle/working/results/eval

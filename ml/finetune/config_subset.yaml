@@ -1,0 +1,38 @@
+# Fine-tuning config — DisasterIQ hackathon subset on AMD MI300
+# Paths are container paths; mount host data at /data and results at /results
+
+data:
+  train_dir: /data/train_subset
+  test_dir: /data/test
+  results_root: /results
+
+subset_prefixes:
+  - mexico-earthquake
+  - midwest-flooding
+  - socal-fire
+  - santa-rosa-wildfire
+
+localization:
+  type: pre
+  encoder: resnet50
+  loss_str: ce+dice
+  epochs: 10
+  batch_size: 8
+  val_batch_size: 8
+  gpus: 1
+  results_dir: /results/loc
+
+damage:
+  type: post
+  dmg_model: siamese
+  encoder: resnet50
+  loss_str: focal+dice
+  epochs: 20
+  batch_size: 4
+  val_batch_size: 4
+  gpus: 1
+  results_dir: /results/dmg
+  ckpt_pre: /results/loc/checkpoints/best.ckpt
+
+eval:
+  results_dir: /results/eval
