@@ -200,8 +200,8 @@ async def seed(reset: bool) -> str:
     print(f"  {len(STOCK)} inventory lines")
 
     print(f"\nseeded. event_id={event_id}")
-    print(f"  curl localhost:8000/api/events/{event_id}")
-    print(f"  curl 'localhost:8000/api/inventory/summary?event_id={event_id}'")
+    print(f"  curl localhost:8765/api/events/{event_id}")
+    print(f"  curl 'localhost:8765/api/inventory/summary?event_id={event_id}'")
     return event_id
 
 

@@ -66,7 +66,12 @@ def main() -> int:
         health = client.get("/health").json()
         check("server is ours", health.get("version") == "0.1.0", str(health.get("version")))
         check("mongodb connected", health["mongodb"] is True)
-        check("cuda available", health["cuda"] is True, health.get("gpu") or "")
+        # CPU-only machines are supported (inference falls back to CPU), so a
+        # missing GPU is reported but does not fail the smoke run.
+        if health["cuda"] is True:
+            check("cuda available", True, health.get("gpu") or "")
+        else:
+            print("  warn  cuda unavailable - running on CPU")
 
         print("\n--- demo event ---")
         events = client.get("/api/events").json()
@@ -75,6 +80,13 @@ def main() -> int:
                      "run scripts/seed_demo.py --reset"):
             return 1
         eid = event["id"]
+        # Ground reports from a previous run outrank satellite in fusion, so
+        # the satellite-vs-truth check below would measure stale state.
+        leftover = client.get(f"/api/events/{eid}/ground-reports").json()
+        if not check("demo event is fresh", not leftover,
+                     f"{len(leftover)} ground reports from an earlier run - "
+                     "run scripts/seed_demo.py --reset"):
+            return 1
 
         print("\n--- S1 + S3: analyze pre/post pair ---")
         with (DEMO / "pre.tif").open("rb") as pre, (DEMO / "post.tif").open("rb") as post:
