@@ -34,4 +34,4 @@ Send the clone URL and point them to [docs/FRIEND_SETUP.md](FRIEND_SETUP.md).
 
 See `.gitignore`: `data/test/`, `backend/.venv/`, `frontend/node_modules/`, `ml/xview2-baseline/`, archives.
 
-`data/demo/` (10 pairs) **is** included so stub mode works out of the box.
+`data/demo/` (7 pairs) **is** included so stub mode works out of the box.

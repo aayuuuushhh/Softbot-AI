@@ -12,7 +12,7 @@ Last checked on this machine:
 | Item | Recommended drive | Size |
 |------|-------------------|------|
 | Repo `D:\AMD` | D: | ~1 GB |
-| `data/demo` (10 pairs) | D: | ~0.3 GB |
+| `data/demo` (7 pairs) | D: | ~0.3 GB |
 | `data/test` (full extract) | D: | ~3 GB |
 | `test_images_labels_targets.tar` | D: | ~2.6 GB |
 | Train archive + extract | D: | ~8–25 GB |

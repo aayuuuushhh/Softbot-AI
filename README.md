@@ -215,9 +215,10 @@ the official source:
 - 🔗 **Official dataset:** [xview2.org](https://xview2.org) — free registration required
 - The download provides the pre/post image pairs plus labels and target masks
 
-This repo already ships **ten curated demo pairs** (`data/demo/images/`, with
-matching xBD labels and ground-truth target masks) so the app runs
-end-to-end out of the box, no download needed.
+This repo already ships **seven demo pairs** (`data/demo/images/`) so the app
+runs end-to-end out of the box, no download needed: three river-valley flood
+scenes, plus four curated xBD pairs that carry matching labels and
+ground-truth target masks.
 
 ### Curate demo pairs from the full dataset
 
@@ -244,8 +245,8 @@ that mode alone. See [`ml/README.md`](ml/README.md) for details.
 
 **The hosted demo runs `stub`, and it is a heuristic, not a learned model.**
 Every input goes through it — the shipped demo pairs and a stranger's upload
-alike. The xBD ground-truth masks in `data/demo/targets/` are used only to rank
-the demo dropdown and for offline evaluation; they are never served as model
+alike. The xBD ground-truth masks in `data/demo/targets/` are used only for offline
+evaluation and to rank the pairs the manifest does not order; they are never served as model
 output. An earlier build did short-circuit to them for demo pairs, which made
 the demo look far better than the system was, and that path has been removed.
 

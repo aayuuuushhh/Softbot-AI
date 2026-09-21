@@ -44,7 +44,7 @@ tar -xf D:\path\to\test_images_labels_targets.tar -C data --strip-components=1
 
 ## 4. Demo pairs (choose one)
 
-**Option A — Already in repo:** `data/demo/` is committed (10 pairs). Skip to step 5.
+**Option A — Already in repo:** `data/demo/` is committed (7 pairs). Skip to step 5.
 
 **Option B — Re-curate from your test extract:**
 
@@ -104,7 +104,7 @@ Download separately; do not commit to git.
 
 ## Troubleshooting
 
-- **No demo pairs in UI:** Run `curate_demo_subset.ps1` or check `GET http://localhost:8000/health` for `demo_pairs: 10`
+- **No demo pairs in UI:** Run `curate_demo_subset.ps1` or check `GET http://localhost:8000/health` for `demo_pairs: 7`
 - **Backend import errors:** Delete `backend\.venv` and re-run `start-backend.ps1`
 - **Docker won't start:** Reboot after WSL install; run `.\scripts\start-docker-admin.ps1` as Admin
 
