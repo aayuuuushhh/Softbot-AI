@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.data/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# model weights
+models/*.pt
+
+# generated artifacts
+data/demo/*.tif
+data/demo/*.jpg
+data/training/*
+!data/training/.gitkeep
+outputs/
+*.pdf
+
+# frontend
+web/node_modules/
+web/.next/

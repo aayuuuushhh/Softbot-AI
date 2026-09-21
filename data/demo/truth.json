@@ -1,0 +1,170 @@
+{
+  "bbox": [
+    85.2,
+    27.95,
+    85.55,
+    28.25
+  ],
+  "size": 1024,
+  "crs": "EPSG:4326",
+  "applied_shift_px": [
+    1.7,
+    1.02
+  ],
+  "clusters": [
+    {
+      "zone": "Dhunche",
+      "lon": 85.297,
+      "lat": 28.112,
+      "severity": "destroyed",
+      "center_px": [
+        283,
+        471
+      ],
+      "buildings_total": 14,
+      "buildings_destroyed": 13
+    },
+    {
+      "zone": "Syaphru Besi",
+      "lon": 85.339,
+      "lat": 28.161,
+      "severity": "major",
+      "center_px": [
+        406,
+        303
+      ],
+      "buildings_total": 22,
+      "buildings_destroyed": 12
+    },
+    {
+      "zone": "Ramche",
+      "lon": 85.256,
+      "lat": 28.036,
+      "severity": "none",
+      "center_px": [
+        163,
+        730
+      ],
+      "buildings_total": 21,
+      "buildings_destroyed": 0
+    },
+    {
+      "zone": "Laharepauwa",
+      "lon": 85.283,
+      "lat": 27.988,
+      "severity": "destroyed",
+      "center_px": [
+        242,
+        894
+      ],
+      "buildings_total": 16,
+      "buildings_destroyed": 14
+    },
+    {
+      "zone": "Kalikasthan",
+      "lon": 85.245,
+      "lat": 27.973,
+      "severity": "none",
+      "center_px": [
+        131,
+        945
+      ],
+      "buildings_total": 15,
+      "buildings_destroyed": 0
+    },
+    {
+      "zone": "Haku",
+      "lon": 85.312,
+      "lat": 28.07,
+      "severity": "destroyed",
+      "center_px": [
+        327,
+        614
+      ],
+      "buildings_total": 14,
+      "buildings_destroyed": 13
+    },
+    {
+      "zone": "Gatlang",
+      "lon": 85.238,
+      "lat": 28.187,
+      "severity": "minor",
+      "center_px": [
+        111,
+        215
+      ],
+      "buildings_total": 22,
+      "buildings_destroyed": 6
+    },
+    {
+      "zone": "Thuman",
+      "lon": 85.375,
+      "lat": 28.205,
+      "severity": "major",
+      "center_px": [
+        512,
+        153
+      ],
+      "buildings_total": 20,
+      "buildings_destroyed": 11
+    }
+  ],
+  "ground_photos": [
+    {
+      "file": "ground/dhunche.jpg",
+      "zone": "Dhunche",
+      "lon": 85.297,
+      "lat": 28.112,
+      "expected": "destroyed"
+    },
+    {
+      "file": "ground/syaphru_besi.jpg",
+      "zone": "Syaphru Besi",
+      "lon": 85.339,
+      "lat": 28.161,
+      "expected": "destroyed"
+    },
+    {
+      "file": "ground/ramche.jpg",
+      "zone": "Ramche",
+      "lon": 85.256,
+      "lat": 28.036,
+      "expected": "intact"
+    },
+    {
+      "file": "ground/laharepauwa.jpg",
+      "zone": "Laharepauwa",
+      "lon": 85.283,
+      "lat": 27.988,
+      "expected": "destroyed"
+    },
+    {
+      "file": "ground/kalikasthan.jpg",
+      "zone": "Kalikasthan",
+      "lon": 85.245,
+      "lat": 27.973,
+      "expected": "intact"
+    },
+    {
+      "file": "ground/haku.jpg",
+      "zone": "Haku",
+      "lon": 85.312,
+      "lat": 28.07,
+      "expected": "destroyed"
+    },
+    {
+      "file": "ground/gatlang.jpg",
+      "zone": "Gatlang",
+      "lon": 85.238,
+      "lat": 28.187,
+      "expected": "intact"
+    },
+    {
+      "file": "ground/thuman.jpg",
+      "zone": "Thuman",
+      "lon": 85.375,
+      "lat": 28.205,
+      "expected": "destroyed"
+    }
+  ]
+}
