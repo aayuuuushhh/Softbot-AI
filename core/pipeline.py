@@ -14,6 +14,7 @@ from shapely.geometry import shape
 
 from core import db
 from core.config import get_settings
+from core.needs import update_zone_needs
 from core.schemas import (
     DamageDetection,
     GroundReport,
@@ -21,6 +22,7 @@ from core.schemas import (
     StageStatus,
     utcnow,
 )
+from core.spatial.graph_network import apply_cv_blockages
 from core.vision.fusion import fuse
 from core.vision.inference import get_ground_backend, get_satellite_backend
 from core.vision.preprocess import (
@@ -91,13 +93,30 @@ async def run_overhead_analysis(event_id: str) -> dict:
         raise
 
     fused = await run_fusion(event_id)
+    blocked = await run_graph_update(event_id)
     return {
         "detections": len(detections),
         "cloud_fraction": round(float(cloud), 4),
         "gsd_m2_per_px": round(gsd, 1),
         "backend": backend.name,
         "zones_updated": len(fused),
+        "roads_blocked_by_cv": len(blocked),
     }
+
+
+async def run_graph_update(event_id: str) -> list[dict]:
+    """S5: roads crossed by detected damage become blocked (source="cv")."""
+    await _set_stage(event_id, "graph", StageStatus.RUNNING)
+    try:
+        flagged = await apply_cv_blockages(event_id)
+        if flagged:
+            log.info("S5: %d road(s) blocked from satellite detections", len(flagged))
+        await _set_stage(event_id, "graph", StageStatus.DONE)
+        return flagged
+    except Exception as exc:
+        await _set_stage(event_id, "graph", StageStatus.FAILED, str(exc))
+        log.exception("S5 failed for event %s", event_id)
+        raise
 
 
 async def run_fusion(event_id: str) -> list[dict]:
@@ -141,6 +160,7 @@ async def run_fusion(event_id: str) -> list[dict]:
                     "buildings_destroyed": zd.buildings_destroyed,
                     "detections": zd.detections,
                     "decided_by": zd.decided_by,
+                    "damage_extent": zd.extent,
                 }},
             )
             out.append({
@@ -148,9 +168,13 @@ async def run_fusion(event_id: str) -> list[dict]:
                 "damage_score": zd.damage_score, "confidence": zd.confidence,
                 "detections": zd.detections, "ground_reports": zd.ground_reports,
                 "decided_by": zd.decided_by, "damaged_area_m2": zd.damaged_area_m2,
+                "extent": zd.extent,
                 "notes": zd.notes,
             })
 
+        # S4: needs follow damage. Baseline parameters here; the allocation
+        # agent recomputes with its evidence-adapted set.
+        await update_zone_needs(event_id)
         await _set_stage(event_id, "fusion", StageStatus.DONE)
         return out
     except Exception as exc:
