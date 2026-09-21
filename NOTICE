@@ -1,0 +1,35 @@
+UDDHAR
+Copyright 2026 Team DarkNem
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+------------------------------------------------------------------------------
+Third-party components
+------------------------------------------------------------------------------
+
+UDDHAR makes use of the following third-party software and data, each of
+which is subject to its own license. These terms apply to those components,
+not to UDDHAR's own source code.
+
+1. xView2 Baseline (building localization + damage classification)
+   Copyright 2019 Carnegie Mellon University / Software Engineering Institute.
+   Released under an MIT (SEI)-style license. Distribution Statement A;
+   reference DM19-0988. The inference Docker image clones this project and
+   downloads its pretrained weights at build time.
+   https://github.com/DIUx-xView/xview2-baseline
+
+2. xView2 / xBD Dataset
+   Building-damage assessment dataset used for demo pairs and fine-tuning.
+   Licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0
+   International (CC BY-NC-SA 4.0). NON-COMMERCIAL USE ONLY. The dataset is not
+   redistributed in this repository; download it from the official source.
+   https://xview2.org
+
+3. Fireworks AI
+   Used at runtime (optional) to generate the AI situation brief via the
+   Fireworks inference API, subject to Fireworks AI's terms of service.
+   https://fireworks.ai
+
+Open-source libraries used by the frontend (Next.js, React, Tailwind CSS,
+Leaflet) and backend (FastAPI, NumPy, SciPy, Pillow, ReportLab) are distributed
+under their respective licenses as declared in package.json and requirements.txt.

@@ -1,0 +1,56 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/demo:/app/data/demo:ro
+      # The app writes /app/uploads and /app/outputs (one level above the app
+      # package — see backend/app/config.py). Mounting /app/app/... here left
+      # dead mounts while jobs silently piled up in the container layer.
+      - ./backend/uploads:/app/uploads
+      - ./backend/outputs:/app/outputs
+      # docker.sock is NOT mounted by default (host root-equivalent risk).
+      # For INFERENCE_MODE=docker locally:
+      #   docker compose -f docker-compose.yml -f docker-compose.docker-inference.yml up --build
+    environment:
+      - DEMO_DATA_DIR=/app/data/demo
+      - INFERENCE_MODE=${INFERENCE_MODE:-stub}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.6-flash}
+      - GEMINI_FALLBACK_MODELS=${GEMINI_FALLBACK_MODELS:-gemini-2.5-flash,gemini-2.0-flash}
+      - XVIEW2_DOCKER_IMAGE=${XVIEW2_DOCKER_IMAGE:-darknem-xview2-inference}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Build only: docker compose --profile build-ml build ml
+  # Run inference via backend when INFERENCE_MODE=docker (see docker-compose.docker-inference.yml)
+  ml:
+    build:
+      context: ./ml/inference
+      dockerfile: Dockerfile
+    image: darknem-xview2-inference
+    profiles:
+      - build-ml

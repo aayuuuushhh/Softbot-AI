@@ -1,0 +1,19 @@
+# Optional overlay: mount the host Docker socket for INFERENCE_MODE=docker.
+# WARNING: grants the backend container root-equivalent control of the host.
+# Never use this on shared or cloud hosts. Render deployments never mount it.
+#
+# KNOWN LIMITATION: this overlay cannot actually run inference. The mounted
+# socket talks to the HOST daemon, so the -v paths the backend passes (its own
+# container paths, e.g. /app/uploads/<job>) resolve against the host
+# filesystem, where they do not exist. The backend detects this and returns a
+# clear 503 instead of mounting empty dirs. For docker inference, run the
+# backend directly on the host:
+#   cd backend && INFERENCE_MODE=docker uvicorn app.main:app
+#
+#   docker compose -f docker-compose.yml -f docker-compose.docker-inference.yml up --build
+services:
+  backend:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - INFERENCE_MODE=${INFERENCE_MODE:-docker}

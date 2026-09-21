@@ -1,0 +1,31 @@
+# Backup pinger for the Render free-tier backend.
+#
+# The primary defence lives in the backend itself (KEEP_ALIVE in render.yaml):
+# the instance pings its own public URL every 10 minutes, which does not depend
+# on GitHub running anything on time. This workflow is the belt to that braces —
+# it covers the case where the app is down or the self-ping is switched off.
+#
+# Do not rely on this alone. GitHub's scheduled runs are best-effort: ticks are
+# routinely delayed or dropped under load, and the schedule is disabled outright
+# after 60 days of repository inactivity. Either gap is longer than the ~15
+# minutes of idle time it takes Render to spin a free instance down, which is
+# exactly how a visitor ends up staring at a cold start. Hence */5: it buys two
+# chances inside the idle window instead of one.
+name: Keep backend warm
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health
+        run: |
+          curl --fail --silent --show-error --location \
+            --max-time 300 \
+            --write-out 'health: %{http_code} in %{time_total}s\n' \
+            --output /dev/null \
+            https://disasteriq-backend.onrender.com/health

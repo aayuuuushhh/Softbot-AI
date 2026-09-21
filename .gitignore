@@ -1,0 +1,48 @@
+.env
+# Next.js reads .env.local for machine-local overrides (e.g. pointing the dev
+# frontend at the deployed backend). Never commit them.
+.env*.local
+.venv/
+venv/
+__pycache__/
+*.pyc
+node_modules/
+.next/
+*.tsbuildinfo
+.pytest_cache/
+
+# Datasets: only data/demo is committed. Training sets and staging dirs are
+# large, regenerable from xView2 downloads, and never belong in git.
+data/test/
+data/train/
+data/train_subset/
+data/tier3/
+data/tier3_subset/
+data/_kaggle_staging/
+data/_kaggle_staging_tier3/
+data/_kaggle_staging_train-nested/
+data/_demo_staging/
+data/curate_log.txt
+
+# Runtime per-analysis job folders and local smoke artifacts
+backend/outputs/
+backend/uploads/
+backend/app/outputs/
+backend/app/uploads/
+backend/smoke_analyze.json
+backend/smoke_brief.json
+backend/.venv/
+
+# Large dataset archives (xView2) — keep on disk for fine-tuning, never commit.
+*.tar
+*.tar.gz
+*.zip
+disasteriq-train-subset.zip
+
+# Upstream clones, trained weights, build logs: large, regenerable, never committed.
+ml/xview2-baseline/
+ml/pytorch-xview2/
+ml/checkpoints/*.ckpt
+ml/build_log*.txt
+.smoke_tmp.py
+*.tmp.mjs
