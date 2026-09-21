@@ -21,3 +21,6 @@ outputs/
 # frontend
 web/node_modules/
 web/.next/
+
+# runtime uploads (satellite pairs, ground photos, overlays)
+data/uploads/
