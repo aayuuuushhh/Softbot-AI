@@ -2,6 +2,8 @@
 
 "use client";
 
+import { AiWorkingLine, Shimmer } from "./AiWorking";
+
 interface Props {
   brief: string | null;
   source: string | null;
@@ -13,24 +15,28 @@ interface Props {
 function LoadingBrief() {
   return (
     <div className="rounded-xl border border-diq-line bg-slate-50 p-5">
-      <div className="flex items-center gap-3">
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-diq-blue" />
+      <AiWorkingLine label="Generating AI situation brief" />
 
-        <div>
-          <p className="text-sm font-black uppercase tracking-[0.12em] text-diq-muted">
-            Generating AI situation brief
-          </p>
+      <p className="mt-2 text-sm text-diq-muted">
+        Converting ranked damage zones into a field-ready response summary.
+      </p>
 
-          <p className="mt-1 text-sm text-diq-muted">
-            Converting ranked damage zones into a field-ready response summary.
-          </p>
-        </div>
+      {/*
+        The placeholder blocks used to be bg-slate-50 on a bg-slate-50 card —
+        an invisible skeleton, so the panel just sat there looking empty while
+        the model worked. They carry a visible tone now, and the prose lines
+        below them stand in for the summary that is coming.
+      */}
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <Shimmer className="h-20 rounded-lg" />
+        <Shimmer className="h-20 rounded-lg" />
+        <Shimmer className="h-20 rounded-lg" />
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <div className="h-20 animate-pulse rounded-lg bg-slate-50" />
-        <div className="h-20 animate-pulse rounded-lg bg-slate-50" />
-        <div className="h-20 animate-pulse rounded-lg bg-slate-50" />
+      <div className="mt-4 space-y-2">
+        <Shimmer className="h-3 w-full" />
+        <Shimmer className="h-3 w-11/12" />
+        <Shimmer className="h-3 w-3/4" />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 // frontend/src/components/AllocationPanel.tsx
 
 import type { ResourceAssignment, ResourceUnit } from "@/lib/api";
+import { AiWorkingLine, Shimmer } from "./AiWorking";
 
 /*
   A dispatch board, not a chart. Coordinators read this to answer one question —
@@ -101,7 +102,29 @@ export default function AllocationPanel({
       </header>
 
       {loading && (
-        <p className="px-5 py-8 text-sm text-diq-muted">Planning allocation…</p>
+        <div className="px-5 py-5">
+          <AiWorkingLine label="Dividing the roster" />
+
+          {/*
+            The roster is already known, so the skeleton is the real board with
+            its numbers withheld — one block per line the plan has to fill.
+          */}
+          <div className="mt-4 space-y-5">
+            {(roster.length > 0 ? roster : Array.from({ length: 3 })).map(
+              (_, index) => (
+                <div key={index}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <Shimmer className="h-4 w-40" />
+                    <Shimmer className="h-3 w-28" />
+                  </div>
+
+                  <Shimmer className="mt-2.5 h-3 w-full" />
+                  <Shimmer className="mt-1.5 h-3 w-4/5" />
+                </div>
+              ),
+            )}
+          </div>
+        </div>
       )}
 
       {!loading && allocation.length === 0 && (
