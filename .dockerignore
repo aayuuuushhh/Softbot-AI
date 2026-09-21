@@ -1,0 +1,20 @@
+# Keep the build context small: no venvs, datasets, weights, or the web app.
+.git
+.venv
+.data
+.pytest_cache
+.ruff_cache
+**/__pycache__
+*.pyc
+.env
+web
+frontend
+backend
+models/*.pt
+data/raw
+data/processed
+data/training
+data/uploads
+data/demo/*.tif
+*.md
+!README.md

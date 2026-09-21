@@ -1,0 +1,51 @@
+# Uddhar: MongoDB + API + dashboard.
+#
+#   cp .env.example .env            # add ANTHROPIC_API_KEY for web-grounded allocation
+#   docker compose up --build
+#   docker compose run --rm api python scripts/seed_demo.py --reset   # demo scenario
+#
+# Dashboard: http://localhost:3000   API docs: http://localhost:8765/docs
+# GPU inference: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      UDDHAR_MONGODB_URI: mongodb://mongo:27017
+      UDDHAR_DEVICE: ${UDDHAR_DEVICE:-cpu}
+      UDDHAR_CORS_ORIGINS: ${UDDHAR_CORS_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ./models:/app/models:ro      # trained .pt files, if any
+      - uploads:/app/data/uploads    # satellite pairs, ground photos, overlays
+    ports:
+      - "8765:8765"
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  mongo-data:
+  uploads:

@@ -1,0 +1,20 @@
+# GPU override: CUDA 12.4 torch wheels and an NVIDIA device for the API.
+# Requires the NVIDIA Container Toolkit on the host.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+
+services:
+  api:
+    build:
+      context: .
+      args:
+        TORCH_INDEX: https://download.pytorch.org/whl/cu124
+    environment:
+      UDDHAR_DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
