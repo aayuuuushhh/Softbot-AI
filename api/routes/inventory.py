@@ -1,8 +1,8 @@
 """Resource and inventory endpoints (F2).
 
-Milestone 1 provides the ledger's read/write surface. The atomic
-reserve/in-transit/delivered state machine arrives with core/inventory.py in
-milestone 3.
+Stock movements driven by dispatches go through core/inventory.py (atomic
+reserve / consume / release). These endpoints cover stock intake, manual
+correction, and the audit log.
 """
 
 from __future__ import annotations
@@ -105,3 +105,10 @@ async def list_nodes(event_id: str) -> list[GraphNode]:
     """Holding centres and staging nodes that hold stock."""
     cursor = db.get_db()[db.NODES].find({"event_id": event_id})
     return [GraphNode.model_validate(db.doc_out(d)) async for d in cursor]
+
+
+@router.get("/ledger", tags=["inventory"])
+async def ledger(event_id: str, limit: int = Query(200, le=1000)) -> list[dict]:
+    """Every stock movement, newest first: reserve, release, consume, transition."""
+    cursor = db.get_db()[db.LEDGER_LOG].find({"event_id": event_id}).sort("at", -1).limit(limit)
+    return [db.doc_out(d) async for d in cursor]
