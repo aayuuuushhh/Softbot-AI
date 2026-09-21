@@ -40,10 +40,10 @@ async def test_openapi_exposes_every_router(client):
         assert expected in paths, f"{expected} missing from the OpenAPI schema"
 
 
-async def test_unbuilt_stages_return_501_not_500(client):
-    """Milestone scaffolds must be honest about being unimplemented."""
+@requires_mongo
+async def test_report_for_a_missing_event_is_404_not_500(client):
     r = await client.get("/api/events/000000000000000000000000/report.pdf")
-    assert r.status_code == 501
+    assert r.status_code == 404
 
 
 @requires_mongo
