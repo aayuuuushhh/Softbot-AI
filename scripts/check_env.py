@@ -24,8 +24,7 @@ TORCH_TORCHVISION = {
 REQUIRED = [
     "torch", "torchvision", "torch_geometric", "cv2", "rasterio", "pyproj",
     "shapely", "numpy", "fastapi", "pydantic", "pydantic_settings", "motor",
-    "pymongo", "networkx", "langchain", "langchain_anthropic", "langchain_tavily",
-    "reportlab",
+    "pymongo", "networkx", "anthropic", "reportlab",
 ]
 
 ok = True
@@ -106,12 +105,8 @@ try:
 
     s = get_settings()
     (good if s.anthropic_api_key else warn)(
-        "ANTHROPIC_API_KEY set" if s.anthropic_api_key
-        else "ANTHROPIC_API_KEY unset - the allocation agent will not run"
-    )
-    (good if s.tavily_api_key else warn)(
-        "TAVILY_API_KEY set" if s.tavily_api_key
-        else "TAVILY_API_KEY unset - historical research will fall back to the baseline"
+        "ANTHROPIC_API_KEY set - web research (Claude web search) enabled" if s.anthropic_api_key
+        else "ANTHROPIC_API_KEY unset - allocation runs on the cited baseline, no web research"
     )
 except Exception as exc:  # noqa: BLE001
     warn(f"could not read settings: {exc}")

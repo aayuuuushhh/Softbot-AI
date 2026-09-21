@@ -32,10 +32,9 @@ dependencies = [
     "networkx>=3.4",
 
     # --- Agents ---
-    "langchain>=1.4",
-    "langchain-anthropic>=1.7",
-    "langchain-tavily>=0.2",
-    "anthropic>=0.70",
+    # Official Anthropic SDK: Claude with the server-side web_search tool does
+    # the historical research, so no separate search API or framework is needed.
+    "anthropic>=1.7",
 
     # --- Reporting ---
     "reportlab>=4.2",

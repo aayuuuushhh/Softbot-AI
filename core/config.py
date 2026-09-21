@@ -70,7 +70,6 @@ class Settings(BaseSettings):
 
     # --- Secrets (no UDDHAR_ prefix; these are conventional names) ---
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
-    tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
 
     @field_validator("cors_origins")
     @classmethod
