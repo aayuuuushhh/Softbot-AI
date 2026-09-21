@@ -191,11 +191,14 @@ def test_torch_backend_falls_back_to_stub_when_the_checkpoint_is_missing(monkeyp
 
 @requires_demo
 def test_stub_ground_classifier_separates_rubble_from_intact_facades(truth):
+    """Exact classes, not just damaged-vs-not. Ground outranks satellite in
+    fusion, so an intact facade scored MINOR would drag a correctly-undamaged
+    zone upward - a regression the smoke run caught at Ramche."""
     classifier = inference.StubGroundClassifier()
+    want = {"intact": Severity.NONE, "destroyed": Severity.DESTROYED}
     for photo in truth["ground_photos"]:
         severity, confidence = classifier.classify(str(DEMO / photo["file"]))
-        damaged = severity in (Severity.MAJOR, Severity.DESTROYED)
-        assert damaged == (photo["expected"] == "destroyed"), (
+        assert severity == want[photo["expected"]], (
             f"{photo['zone']}: expected {photo['expected']}, got {severity}"
         )
         assert 0.0 <= confidence <= 1.0

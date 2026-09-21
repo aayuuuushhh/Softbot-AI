@@ -242,11 +242,21 @@ class StubGroundClassifier:
 
     Intact buildings present long, straight, high-contrast edges (walls, roof
     lines, window rows). Collapse replaces that with high-frequency, randomly
-    oriented texture and a duller, greyer palette. We score the ratio of
-    coherent linear structure to overall edge energy.
+    oriented texture and a duller, greyer palette. We score how much of the
+    edge energy is axis-aligned (coherent structure) against how much edge
+    energy there is overall.
+
+    Not a Hough line count: rubble texture yields hundreds of short spurious
+    segments, so a count rises with damage - the opposite of what we want.
+    Assumes a roughly upright camera; a steeply tilted shot reads as less
+    intact. The torch backend has no such assumption.
     """
 
     name = "stub"
+
+    # Fraction of edge pixels within +/-12 deg of horizontal or vertical that
+    # an isotropic texture would produce by chance (48 / 180).
+    _AXIS_CHANCE = 48.0 / 180.0
 
     def classify(self, image_path: str) -> tuple[Severity, float]:
         image = load_ground_image(image_path, size=384)
@@ -255,24 +265,32 @@ class StubGroundClassifier:
         edges = cv2.Canny(gray, 60, 160)
         edge_density = float(edges.mean() / 255.0)
 
-        lines = cv2.HoughLinesP(
-            edges, 1, np.pi / 180, threshold=55, minLineLength=45, maxLineGap=12
-        )
-        n_lines = 0 if lines is None else len(lines)
+        # Gradient orientation at edge pixels, folded to [0, 180).
+        gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0)
+        gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1)
+        on_edge = edges > 0
+        if on_edge.any():
+            angle = np.degrees(np.arctan2(gy[on_edge], gx[on_edge])) % 180.0
+            aligned = (np.minimum(angle, 180.0 - angle) < 12.0) | (np.abs(angle - 90.0) < 12.0)
+            axis_fraction = float(aligned.mean())
+        else:
+            axis_fraction = self._AXIS_CHANCE
 
         # Rubble is desaturated and has high local variance.
         saturation = float(cv2.cvtColor(image, cv2.COLOR_RGB2HSV)[..., 1].mean() / 255.0)
         local_var = float(cv2.Laplacian(gray, cv2.CV_32F).var())
 
-        structure = min(n_lines / 45.0, 1.0)           # 1.0 = very intact
-        chaos = min(edge_density / 0.14, 1.0)          # 1.0 = very rubbled
+        structure = float(np.clip(                        # 1.0 = very intact
+            (axis_fraction - self._AXIS_CHANCE) / (0.85 - self._AXIS_CHANCE), 0.0, 1.0
+        ))
+        chaos = min(edge_density / 0.14, 1.0)             # 1.0 = very rubbled
         texture = min(local_var / 2600.0, 1.0)
         dullness = 1.0 - min(saturation / 0.34, 1.0)
 
-        damage = float(
-            np.clip(0.42 * chaos + 0.28 * texture + 0.20 * dullness - 0.38 * structure + 0.22,
-                    0.0, 1.0)
-        )
+        damage = float(np.clip(
+            0.45 * chaos + 0.20 * texture + 0.10 * dullness + 0.35 * (1.0 - structure) - 0.10,
+            0.0, 1.0,
+        ))
         # Heuristics deserve modest confidence; the torch backend and fusion
         # are what should raise it.
         confidence = float(np.clip(0.40 + 0.25 * abs(damage - 0.5) * 2.0, 0.0, 0.72))
