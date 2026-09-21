@@ -105,27 +105,30 @@ def square(lon: float, lat: float, half: float = BOX) -> dict:
     }
 
 
-async def seed(reset: bool) -> str:
+async def seed(reset: bool, event_name: str | None = None, verbose: bool = True) -> str:
+    """Insert the demo scenario. `event_name` overrides the name (tests use this)."""
     database = db.get_db()
     await db.init_indexes()
+    event = {**EVENT, "name": event_name or EVENT["name"]}
+    say = print if verbose else (lambda *a, **k: None)
 
     if reset:
-        existing = await database[db.EVENTS].find_one({"name": EVENT["name"]})
+        existing = await database[db.EVENTS].find_one({"name": event["name"]})
         if existing:
             eid = str(existing["_id"])
-            for coll in (db.ZONES, db.NODES, db.EDGES, db.INVENTORY,
-                         db.DISPATCHES, db.GROUND_REPORTS, db.AGENT_RUNS):
+            for coll in (db.ZONES, db.NODES, db.EDGES, db.INVENTORY, db.DISPATCHES,
+                         db.GROUND_REPORTS, db.AGENT_RUNS, db.DETECTIONS, db.LEDGER_LOG):
                 await database[coll].delete_many({"event_id": eid})
             await database[db.EVENTS].delete_one({"_id": existing["_id"]})
-            print(f"removed previous demo event {eid}")
+            say(f"removed previous demo event {eid}")
 
-    event_doc = dict(EVENT)
+    event_doc = dict(event)
     event_doc["stages"] = PipelineStages().model_dump()
     event_doc["cloud_fraction"] = 0.0
     event_doc["crs"] = "EPSG:4326"
     event_doc["created_at"] = utcnow()
     event_id = str((await database[db.EVENTS].insert_one(event_doc)).inserted_id)
-    print(f"event {event_id}  {EVENT['name']}")
+    say(f"event {event_id}  {event['name']}")
 
     # Zones become graph nodes too, so routing has somewhere to deliver.
     name_to_node: dict[str, str] = {}
@@ -155,7 +158,7 @@ async def seed(reset: bool) -> str:
             "capacity": 0,
         }
         name_to_node[name] = str((await database[db.NODES].insert_one(node_doc)).inserted_id)
-    print(f"  {len(ZONES)} zones (each also a graph node)")
+    say(f"  {len(ZONES)} zones (each also a graph node)")
 
     for name, kind, lon, lat, cap in SUPPLY_NODES:
         node_doc = {
@@ -167,7 +170,7 @@ async def seed(reset: bool) -> str:
             "capacity": cap,
         }
         name_to_node[name] = str((await database[db.NODES].insert_one(node_doc)).inserted_id)
-    print(f"  {len(SUPPLY_NODES)} supply nodes")
+    say(f"  {len(SUPPLY_NODES)} supply nodes")
 
     edge_docs = []
     for u, v, km, status in ROADS:
@@ -181,7 +184,7 @@ async def seed(reset: bool) -> str:
         })
     await database[db.EDGES].insert_many(edge_docs)
     blocked = sum(1 for r in ROADS if r[3] is EdgeStatus.BLOCKED)
-    print(f"  {len(ROADS)} roads ({blocked} blocked, "
+    say(f"  {len(ROADS)} roads ({blocked} blocked, "
           f"{sum(1 for r in ROADS if r[3] is EdgeStatus.DEGRADED)} degraded)")
 
     stock_docs = [
@@ -197,11 +200,11 @@ async def seed(reset: bool) -> str:
         for node, kind, sku, qty, unit in STOCK
     ]
     await database[db.INVENTORY].insert_many(stock_docs)
-    print(f"  {len(STOCK)} inventory lines")
+    say(f"  {len(STOCK)} inventory lines")
 
-    print(f"\nseeded. event_id={event_id}")
-    print(f"  curl localhost:8765/api/events/{event_id}")
-    print(f"  curl 'localhost:8765/api/inventory/summary?event_id={event_id}'")
+    say(f"\nseeded. event_id={event_id}")
+    say(f"  curl localhost:8765/api/events/{event_id}")
+    say(f"  curl 'localhost:8765/api/inventory/summary?event_id={event_id}'")
     return event_id
 
 

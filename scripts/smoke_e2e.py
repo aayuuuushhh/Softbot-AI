@@ -149,11 +149,34 @@ def main() -> int:
         check("ground reports persisted", isinstance(reports, list) and len(reports) >= 4,
               f"{len(reports) if isinstance(reports, list) else reports}")
 
-        print("\n--- unbuilt milestones still honest ---")
-        check("allocate -> 501",
-              client.post(f"/api/events/{eid}/allocate").status_code == 501)
-        check("report.pdf -> 501",
-              client.get(f"/api/events/{eid}/report.pdf").status_code == 501)
+        print("\n--- S4-S8: needs, graph, allocation ---")
+        needs = client.get(f"/api/events/{eid}/needs").json()
+        check("needs computed after fusion",
+              any(n.get("affected_people", 0) > 0 for n in needs))
+        reach = {r["name"]: r["status"] for r in client.get(f"/api/events/{eid}/reachability").json()}
+        check("blocked road leaves Haku unreachable", reach.get("Haku") == "unreachable", str(reach))
+
+        resp = client.post(f"/api/events/{eid}/allocate", timeout=600)
+        if check("allocate returns 200", resp.status_code == 200, resp.text[:160]):
+            plan = resp.json()
+            print(f"        mode={plan['mode']} research={plan['research_status']} "
+                  f"precedents={plan['precedents']} accepted={len(plan['accepted'])}")
+            for note in plan["notes"]:
+                print(f"        note: {note}")
+            check("dispatch orders planned", len(plan["dispatches"]) > 0, str(len(plan["dispatches"])))
+            check("every order cited", all(d["citations"] for d in plan["dispatches"]))
+            check("no violations", not plan["violations"], str(plan["violations"]))
+
+        approved = client.post(f"/api/events/{eid}/dispatches/approve").json()
+        check("orders reserved", len(approved["reserved"]) > 0, f"{len(approved['reserved'])} reserved")
+        stock = client.get(f"/api/inventory?event_id={eid}").json()
+        check("reserved never exceeds stock", all(s["reserved"] <= s["quantity"] for s in stock))
+
+        pdf = client.get(f"/api/events/{eid}/report.pdf")
+        check("report.pdf served", pdf.status_code == 200 and pdf.content[:4] == b"%PDF",
+              f"{len(pdf.content) // 1024} KiB")
+        txt = client.get(f"/api/events/{eid}/summary.txt")
+        check("radio summary served", txt.status_code == 200 and "SITREP" in txt.text)
     finally:
         proc.terminate()
         try:

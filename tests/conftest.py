@@ -58,7 +58,7 @@ def _purge_test_events():
         ids = [str(e["_id"]) for e in db.events.find({"name": {"$regex": "^pytest"}})]
         if not ids:
             return
-        for coll in ("zones", "nodes", "edges", "inventory",
-                     "dispatches", "ground_reports", "agent_runs"):
+        for coll in ("zones", "nodes", "edges", "inventory", "dispatches",
+                     "ground_reports", "agent_runs", "detections", "ledger_log"):
             db[coll].delete_many({"event_id": {"$in": ids}})
         db.events.delete_many({"name": {"$regex": "^pytest"}})
