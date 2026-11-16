@@ -998,7 +998,7 @@ export default function HomePage() {
               />
             </div>
 
-            <RosterEditor roster={roster} onChange={setRoster} disabled={loading} />
+            
           </aside>
 
           <section className="space-y-4">
@@ -1013,15 +1013,7 @@ export default function HomePage() {
                   </div>
 
                   {preUrl ? (
-                    /*
-                      object-contain, not object-cover: the After panel contains
-                      its image (DamageCanvas maps zone boxes onto that exact
-                      letterboxed rect, so it cannot cover). Covering here would
-                      crop and rescale Before independently, and the two panels
-                      would show the same ground at different scales — the one
-                      thing a before/after comparison must never do. Same fit on
-                      both sides keeps every pixel aligned across the split.
-                    */
+              
                     <img
                       src={preUrl}
                       alt="Before disaster satellite imagery"
@@ -1031,14 +1023,7 @@ export default function HomePage() {
                     <EmptyImageState />
                   )}
 
-                  {/*
-                    No source credit on the Before panel. It used to name
-                    Maxar/xBD, which was true of the xBD demo set and is not
-                    true of the imagery shipped in data/demo today — a credit
-                    naming the wrong provider is worse than none. Put the real
-                    attribution back here once the new demo scenes' source is
-                    settled.
-                  */}
+
 
                   <FullscreenButton targetRef={beforePanelRef} />
                 </div>

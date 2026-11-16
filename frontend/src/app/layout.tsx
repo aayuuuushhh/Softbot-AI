@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   // /favicon.ico request that this app does not serve.
   icons: { icon: "data:," },
   description:
-    "AI-powered building damage assessment from pre/post disaster satellite imagery. Deterministic ML scoring, ranked zone triage, English situation briefs. Team DarkNem — AMD Hackathon ACT II.",
+    "AI-powered building damage assessment from pre/post disaster satellite imagery. Deterministic ML scoring, ranked zone triage, English situation briefs.",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-diq-bg text-diq-ink antialiased">
+      <body className="min-h-screen antialiased bg-diq-bg text-diq-ink">
         {children}
       </body>
     </html>
