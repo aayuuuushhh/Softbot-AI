@@ -82,7 +82,7 @@ export default function AllocationPanel({
   );
 
   return (
-    <section className="overflow-hidden rounded-xl border border-diq-line bg-white shadow-sm shadow-slate-900/5">
+    <section className="overflow-hidden bg-white border shadow-sm rounded-xl border-diq-line shadow-slate-900/5">
       <header className="border-b border-diq-line bg-slate-50 px-5 py-3.5">
         <h3 className="text-base font-semibold text-diq-ink">
           Resource allocation
@@ -92,7 +92,7 @@ export default function AllocationPanel({
         </p>
 
         {roster.length > 0 && (
-          <p className="tabular mt-2 text-xs text-slate-700">
+          <p className="mt-2 text-xs tabular text-slate-700">
             <span className="font-semibold text-diq-ink">On hand:</span>{" "}
             {roster
               .map((r) => `${r.name} ${formatCount(r.quantity)}`)
@@ -114,7 +114,7 @@ export default function AllocationPanel({
               (_, index) => (
                 <div key={index}>
                   <div className="flex items-baseline justify-between gap-3">
-                    <Shimmer className="h-4 w-40" />
+                    <Shimmer className="w-40 h-4" />
                     <Shimmer className="h-3 w-28" />
                   </div>
 
@@ -141,7 +141,7 @@ export default function AllocationPanel({
                 <p className="text-sm font-semibold text-diq-ink">
                   {resource.name}
                 </p>
-                <p className="tabular text-xs text-diq-muted">
+                <p className="text-xs tabular text-diq-muted">
                   {formatCount(committed)} of {formatCount(resource.quantity)}{" "}
                   {resource.unit} committed
                 </p>

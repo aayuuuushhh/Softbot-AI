@@ -142,7 +142,7 @@ function UploadDropBox({
 
   return (
     <div
-      className="rounded-2xl border border-dashed border-diq-line bg-slate-50 p-3"
+      className="p-3 border border-dashed rounded-2xl border-diq-line bg-slate-50"
       onDragOver={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -154,7 +154,7 @@ function UploadDropBox({
       }}
     >
       <div className="flex flex-col items-center justify-center text-center">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-diq-line bg-slate-50 text-xl text-diq-muted">
+        <div className="flex items-center justify-center w-10 h-10 text-xl border rounded-2xl border-diq-line bg-slate-50 text-diq-muted">
           ⇧
         </div>
 
@@ -164,7 +164,7 @@ function UploadDropBox({
 
         <p className="mt-1 text-[11px] text-diq-muted">or select files below</p>
 
-        <div className="my-3 h-px w-full bg-diq-line/40" />
+        <div className="w-full h-px my-3 bg-diq-line/40" />
       </div>
 
       <div className="space-y-2.5">
@@ -210,7 +210,7 @@ function EmptyImageState() {
   return (
     <div className="flex h-full min-h-[720px] items-center justify-center bg-slate-50">
       <div className="px-6 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-diq-line bg-slate-50 text-xl text-diq-muted">
+        <div className="flex items-center justify-center w-12 h-12 mx-auto text-xl border rounded-2xl border-diq-line bg-slate-50 text-diq-muted">
           ◇
         </div>
 
@@ -279,7 +279,7 @@ function PipelineStatus({
   ];
 
   return (
-    <div className="rounded-2xl border border-diq-line bg-slate-50 p-4">
+    <div className="p-4 border rounded-2xl border-diq-line bg-slate-50">
       <div className="flex items-center gap-2">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
           2
@@ -347,7 +347,7 @@ function PipelineStatus({
       </div>
 
       {analysisState === "done" && (
-        <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-center">
+        <div className="px-4 py-4 mt-5 text-center border border-green-200 rounded-xl bg-green-50">
           <p className="text-sm font-bold text-green-800">
             ✓ Analysis Complete
           </p>
@@ -432,7 +432,7 @@ function BackendOfflineNotice({ onRetry }: { onRetry: () => void }) {
 
 function ErrorNotice({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3">
+    <div className="px-3 py-3 border border-red-200 rounded-xl bg-red-50">
       <p className="text-sm font-bold text-red-800">Action blocked</p>
       <p className="mt-1 text-xs leading-5 text-red-800/70">{message}</p>
     </div>
@@ -451,12 +451,12 @@ function MapControls({
   canZoomOut: boolean;
 }) {
   return (
-    <div className="absolute bottom-4 right-4 z-20 flex flex-col overflow-hidden rounded-lg border border-diq-line bg-slate-50 shadow-sm shadow-slate-900/5">
+    <div className="absolute z-20 flex flex-col overflow-hidden border rounded-lg shadow-sm bottom-4 right-4 border-diq-line bg-slate-50 shadow-slate-900/5">
       <button
         type="button"
         onClick={onZoomIn}
         disabled={!canZoomIn}
-        className="flex h-9 w-9 items-center justify-center border-b border-diq-line text-lg font-bold text-diq-ink transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex items-center justify-center text-lg font-bold transition border-b h-9 w-9 border-diq-line text-diq-ink hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Zoom in"
       >
         +
@@ -466,7 +466,7 @@ function MapControls({
         type="button"
         onClick={onZoomOut}
         disabled={!canZoomOut}
-        className="flex h-9 w-9 items-center justify-center text-lg font-bold text-diq-ink transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex items-center justify-center text-lg font-bold transition h-9 w-9 text-diq-ink hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Zoom out"
       >
         −
@@ -506,7 +506,7 @@ function FullscreenButton({
     <button
       type="button"
       onClick={toggleFullscreen}
-      className="absolute bottom-4 right-16 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-diq-line bg-slate-50 text-sm text-diq-ink shadow-sm shadow-slate-900/5 transition hover:bg-slate-100"
+      className="absolute z-20 flex items-center justify-center text-sm transition border rounded-lg shadow-sm bottom-4 right-16 h-9 w-9 border-diq-line bg-slate-50 text-diq-ink shadow-slate-900/5 hover:bg-slate-100"
       aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
     >
       {isFullscreen ? "⤡" : "⛶"}
@@ -858,7 +858,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-diq-bg text-diq-ink diq-grid-bg">
       <div className="mx-auto max-w-[1920px] px-4 py-4">
-        <header className="mb-4 border-b border-diq-line pb-4">
+        <header className="pb-4 mb-4 border-b border-diq-line">
           <div>
             <div>
               <div>
@@ -876,8 +876,8 @@ export default function HomePage() {
         </header>
 
         <section className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <aside className="overflow-hidden rounded-xl border border-diq-line bg-diq-panel shadow-sm shadow-slate-900/5">
-            <div className="border-b border-diq-line bg-slate-50 px-4 py-3">
+          <aside className="overflow-hidden border shadow-sm rounded-xl border-diq-line bg-diq-panel shadow-slate-900/5">
+            <div className="px-4 py-3 border-b border-diq-line bg-slate-50">
               <h2 className="font-label text-xs uppercase tracking-[0.18em] text-slate-700">
                 Mission Control
               </h2>
@@ -885,7 +885,7 @@ export default function HomePage() {
 
             <div className="space-y-3.5 p-4">
               <div>
-                <div className="mb-3 flex items-center gap-2">
+                <div className="flex items-center gap-2 mb-3">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
                     1
                   </span>
@@ -937,7 +937,7 @@ export default function HomePage() {
                     clearFindings();
                   }}
                   disabled={pairs.length === 0}
-                  className="w-full rounded-xl border border-diq-line bg-slate-50 px-3 py-3 text-sm text-diq-ink transition hover:border-diq-line disabled:cursor-not-allowed disabled:text-diq-muted"
+                  className="w-full px-3 py-3 text-sm transition border rounded-xl border-diq-line bg-slate-50 text-diq-ink hover:border-diq-line disabled:cursor-not-allowed disabled:text-diq-muted"
                 >
                   {pairs.length === 0 && (
                     <option value="">
@@ -959,7 +959,7 @@ export default function HomePage() {
                   onClick={loadDemoPair}
                   disabled={loadPairBlockedReason !== null}
                   title={loadPairBlockedReason ?? "Load the selected before/after pair"}
-                  className="w-full rounded-lg border border-diq-line bg-white px-4 py-3 text-sm font-semibold text-diq-ink transition hover:border-diq-blue hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="w-full px-4 py-3 text-sm font-semibold transition bg-white border rounded-lg border-diq-line text-diq-ink hover:border-diq-blue hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {pairs.length === 0 && connecting
                     ? "▣ Waiting for demo pairs…"
@@ -975,7 +975,7 @@ export default function HomePage() {
                   type="button"
                   onClick={runAnalysis}
                   disabled={loading || !canAnalyze}
-                  className="w-full rounded-lg bg-diq-blue px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-slate-900/10 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-55"
+                  className="w-full px-4 py-3 text-sm font-semibold text-white transition rounded-lg shadow-sm bg-diq-blue shadow-slate-900/10 hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   {loading ? "Analyzing Damage…" : "⌘ Analyze Damage"}
                 </button>
@@ -1002,11 +1002,11 @@ export default function HomePage() {
           </aside>
 
           <section className="space-y-4">
-            <div className="overflow-hidden rounded-xl border border-diq-line bg-diq-panel shadow-sm shadow-slate-900/5">
+            <div className="overflow-hidden border shadow-sm rounded-xl border-diq-line bg-diq-panel shadow-slate-900/5">
               <div className="grid min-h-[720px] gap-0 lg:grid-cols-2">
                 <div
                   ref={beforePanelRef}
-                  className="relative overflow-hidden border-b border-diq-line bg-white lg:border-b-0 lg:border-r"
+                  className="relative overflow-hidden bg-white border-b border-diq-line lg:border-b-0 lg:border-r"
                 >
                   <div className="absolute left-4 top-4 z-20 rounded bg-blue-950/90 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-white shadow-sm shadow-slate-900/5">
                     Before Disaster
@@ -1025,7 +1025,7 @@ export default function HomePage() {
                     <img
                       src={preUrl}
                       alt="Before disaster satellite imagery"
-                      className="absolute inset-0 h-full w-full object-contain"
+                      className="absolute inset-0 object-contain w-full h-full"
                     />
                   ) : (
                     <EmptyImageState />
@@ -1053,7 +1053,7 @@ export default function HomePage() {
 
                   {postUrl ? (
                     <div
-                      className="h-full w-full origin-center transition-transform duration-200 ease-out"
+                      className="w-full h-full transition-transform duration-200 ease-out origin-center"
                       style={{ transform: `scale(${afterZoom})` }}
                     >
                       <DamageCanvas postImageUrl={postUrl} analysis={analysis} />
