@@ -1075,24 +1075,7 @@ export default function HomePage() {
 
             <ZoneMap analysis={analysis} postImageUrl={postUrl || undefined} />
 
-            <BriefPanel
-              brief={brief}
-              source={briefSource}
-              loading={briefLoading}
-              onDownloadReport={handleDownloadReport}
-              reportLoading={reportLoading}
-            />
-
-            <div className="grid gap-4 2xl:grid-cols-2">
-              <RiskPanel risks={risks} loading={briefLoading} />
-
-              <AllocationPanel
-                allocation={allocation}
-                reserveNotes={reserveNotes}
-                roster={planRoster}
-                loading={briefLoading}
-              />
-            </div>
+            
           </section>
 
         </section>
