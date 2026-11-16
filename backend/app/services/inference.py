@@ -1,14 +1,4 @@
-"""Inference adapter: stub demo inference or Docker baseline inference.
-
-This file owns:
-1. demo-pair discovery
-2. demo image path resolution
-3. inference execution
-
-Important:
-- /demo/pairs, /demo/images, and /analyze must agree about where demo files live.
-- main.py expects run_inference(pre_path, post_path, out_dir) -> (mask_path, mode).
-"""
+"""Discover demo pairs and run damage-mask inference for the configured mode."""
 
 from __future__ import annotations
 
@@ -115,15 +105,7 @@ def _demo_damage_rank(post_path: Path) -> int:
 
 
 def _manifest_order() -> dict[str, int]:
-    """The curated demo order, as listed in data/demo/manifest.json.
-
-    Ordering used to be damage rank alone, which only works while every pair
-    ships an xBD ground-truth target to count damaged pixels in. The demo set
-    now mixes curated xBD scenes with imagery that has no target at all, and
-    those scored 0 — sorting the headline pairs to the bottom of the dropdown.
-    The manifest is the explicit answer: whatever it lists leads, in the order
-    it lists, and anything else falls back to damage rank behind it.
-    """
+    """Return the curated pair order from the manifest."""
     manifest = settings.demo_data_dir / "manifest.json"
     try:
         pairs = json.loads(manifest.read_text(encoding="utf-8")).get("pairs") or []
@@ -134,14 +116,7 @@ def _manifest_order() -> dict[str, int]:
 
 
 def _demo_dir_key() -> tuple[tuple[str, float, float], ...]:
-    """Cache key for the demo listing: each search dir plus its mtime and the
-    newest PNG mtime inside it.
-
-    A new pair dropped into the folder changes the directory mtime. Overwriting
-    an existing PNG in place does NOT (only add/remove/rename touch a directory
-    mtime), so the key also folds in the newest file mtime — a handful of stat()
-    calls, still nothing like re-decoding the masks the cache exists to avoid.
-    """
+    """Return directory and newest-image timestamps for the listing cache."""
     key: list[tuple[str, float, float]] = []
     try:
         manifest_mtime = (settings.demo_data_dir / "manifest.json").stat().st_mtime
@@ -202,29 +177,11 @@ def _list_demo_pairs(_key: tuple[tuple[str, float], ...]) -> tuple[dict[str, str
 
     ranked.sort(key=lambda item: (item[0], -item[1], item[2]))
 
-    return tuple(pair for _listed, _damage, _base, pair in ranked)
+    return tuple(item[3] for item in ranked)
 
 
 def list_demo_pairs() -> list[dict[str, str]]:
-    """Return all before/after demo pairs, most-damaged first.
-
-    Expected naming:
-        <id>_pre_disaster.png
-        <id>_post_disaster.png
-
-    Ordering matters: the dashboard selects the first pair by default, and
-    several xBD scenes are genuinely undamaged. Sorting alphabetically put such
-    a pair first, so the default analysis returned an all-zero result that read
-    as a broken app. manifest.json now names the demo order outright (see
-    _manifest_order); anything it does not list falls in behind, ranked by
-    ground-truth damage so the default pair still exercises the damage classes,
-    priority zones and map. Undamaged pairs remain selectable, just not first.
-
-    Ranking decodes every ground-truth target PNG, and this runs on /health —
-    the endpoint the dashboard polls, in bursts, exactly while a free-tier host
-    is still booting and has the least CPU to spare. The result is cached so
-    those probes cost a stat() each instead of re-decoding the whole demo set.
-    """
+    """Return manifest-ordered demo pairs, then rank unlisted pairs by damage."""
     return [dict(pair) for pair in _list_demo_pairs(_demo_dir_key())]
 
 
@@ -401,26 +358,7 @@ def _diff_mask(pre_image_path: Path, post_image_path: Path, out_path: Path) -> P
 
 
 def _make_stub_mask(pre_image_path: Path, post_image_path: Path, out_dir: Path) -> tuple[Path, str]:
-    """Produce a damage mask without a trained model, from the imagery alone.
-
-    Every input takes the same path — a pre/post difference heuristic — whether
-    it is a shipped demo pair or an image a stranger just uploaded.
-
-    This used to short-circuit: when a demo pair had an xBD ground-truth target
-    in data/demo/targets/, that label file was copied out verbatim and returned
-    as the "prediction". The demo pairs then scored perfectly and unseen uploads
-    fell off a cliff, because the demo was reciting an answer key rather than
-    inferring anything. Do not reintroduce that. The targets remain in the repo
-    for ranking (see _demo_damage_rank) and offline evaluation — never as model
-    output served to a user.
-
-    Pixel values match the xView2 scheme used by scoring.py:
-        0 = background (no building)
-        1 = none (undamaged building)
-        2 = minor
-        3 = major
-        4 = destroyed
-    """
+    """Build a heuristic mask using xView2 classes; ground truth is never output."""
     out_dir.mkdir(parents=True, exist_ok=True)
     mask_path = out_dir / "damage_mask.png"
 
