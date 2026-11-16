@@ -13,6 +13,8 @@ Important:
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from functools import lru_cache
@@ -38,6 +40,26 @@ ILLUM_CLAMP = 40.0
 MIN_TEXTURE_STD = 8.0
 MAX_ALIGN_FRACTION = 0.08
 ALIGN_ESTIMATE_MAX_DIM = 1024
+
+
+def _docker_executable() -> str:
+    executable = shutil.which("docker")
+    if executable:
+        return executable
+
+    if sys.platform == "win32":
+        desktop_cli = (
+            Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+            / "Docker"
+            / "Docker"
+            / "resources"
+            / "bin"
+            / "docker.exe"
+        )
+        if desktop_cli.is_file():
+            return str(desktop_cli)
+
+    return "docker"
 
 
 def _demo_search_dirs() -> list[Path]:
@@ -439,7 +461,7 @@ def _run_docker_baseline(pre_image_path: Path, post_image_path: Path, out_dir: P
         raise RuntimeError("pre and post images must be in the same directory for docker inference")
 
     command = [
-        "docker",
+        _docker_executable(),
         "run",
         "--rm",
         "-v",

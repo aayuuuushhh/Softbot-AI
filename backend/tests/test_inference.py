@@ -197,6 +197,18 @@ def test_unsupported_mode_raises_runtime_error(tmp_path, monkeypatch):
         inference.run_inference(pre, post, tmp_path / "out")
 
 
+def test_docker_cli_falls_back_to_docker_desktop_install_path(tmp_path, monkeypatch):
+    docker = tmp_path / "Docker" / "Docker" / "resources" / "bin" / "docker.exe"
+    docker.parent.mkdir(parents=True)
+    docker.touch()
+
+    monkeypatch.setattr(inference.shutil, "which", lambda _: None)
+    monkeypatch.setattr(inference.sys, "platform", "win32")
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+
+    assert inference._docker_executable() == str(docker)
+
+
 def test_pytorch_mode_requires_a_checkpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(inference.settings, "inference_mode", "pytorch")
     monkeypatch.setattr(inference.settings, "pytorch_checkpoint_path", tmp_path / "absent.ckpt")

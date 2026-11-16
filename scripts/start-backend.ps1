@@ -3,6 +3,12 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 $backendDir = Join-Path $repoRoot "backend"
 $venvPython = Join-Path $backendDir ".venv\Scripts\python.exe"
 $systemPython = Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"
+$dockerBin = Join-Path $env:ProgramFiles "Docker\Docker\resources\bin"
+
+# Docker Desktop's CLI may be missing from PATH in an already-open VS Code shell.
+if (Test-Path (Join-Path $dockerBin "docker.exe")) {
+    $env:PATH = "$dockerBin;$env:PATH"
+}
 
 if (-not (Test-Path $venvPython)) {
     Write-Host "Creating venv..."
